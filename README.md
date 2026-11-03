@@ -4,9 +4,11 @@ Een zelfstandig werkprototype voor de LILYGO T-Display S3 Long. USB is de standa
 
 Dit project bevat een schermdemo, een USB/wifi-benchprogramma voor macOS/Linux, een pseudo-terminalsimulator en testfirmware. Het verstuurt **geen echte bureau- of monitorcommando's**. Wifi en applicatie-updates gebruiken dezelfde versleutelde, met een eigen sleutel geauthenticeerde verbinding. MQTT-integratie en een productiebeheerlaag zijn nog niet geïmplementeerd. Rollback en wifi-updates met automatisch hervatten na verbindingsverlies zijn fysiek getest; zie de teststatus hieronder.
 
-## Actuele hardwareteststatus
+## Actuele ontwerp-preview
 
-Firmware **0.3.3** draait bevestigd geldig op het paneel. Een volledige wifi-update met echte verbindingsuitval, automatisch hervatten, herstart en bootbevestiging is geslaagd. Twee gerichte fysieke onderbrekingsproeven en 45 lokale regressietests ondersteunen dit. Een eerdere volledige proef vereiste nog herstel van de bootbevestiging; de gevonden rebootrace is daarna in de hosttool opgelost. Zie [het OTA-herstelrapport](docs/ota-recovery-2026-11-03.md) voor bewijs en grenzen. Stroomuitval tijdens schrijven/activeren en meerdaagse stabiliteit zijn nog niet getest.
+De zelfstandige displaydemo gebruikt de zeventien aangeleverde ontwerpen en lokale voorbeeldwaarden. **Vanaf 0.4.3 wijzigen een korte tik en vasthouden alleen de doelhoogte; pas Bevestigen start de gesimuleerde beweging. De hoogte blijft binnen 62–127 cm.** Firmware **0.5.0 is via USB geïnstalleerd en geverifieerd**. Zie [de bediening en teststatus](docs/display-demo.md).
+
+De 0.4.1-wifi-overdracht bereikte door herhaalde verbindingsuitval het herstelbudget rond 95%. Het eerdere succesvolle 0.3.3-herstelbewijs is daarmee geen algemene OTA-acceptatie voor de grotere demoimage. De huidige installatieroute is USB.
 
 ## Firmware-updates zonder USB
 
@@ -73,7 +75,7 @@ uv tool run --from platformio==6.1.18 pio run --project-dir firmware --target up
 uv run panel bench --port <poort> --duration 30 --height 740 --brightness 60
 ```
 
-De firmware toont steeds dat de waarden demo zijn. `--brightness` verandert alleen de getoonde monitorwaarde; het regelt geen echte monitor of schermbacklight. Tikken op ZITTEN, STAAN en MONITOR levert diagnostische touch-events op. Na circa 3,5 seconden zonder host-heartbeat toont het scherm verbindingsverlies.
+De firmware toont steeds dat de waarden demo zijn. `--brightness` verandert alleen de getoonde monitorwaarde; het regelt geen echte monitor of schermbacklight. De huidige zelfstandige demo reageert lokaal op de touchbediening; zie de actuele bedieningsbeschrijving hierboven. De beheersessie bewaakt zijn host-heartbeat; de lokale demo blijft onafhankelijk daarvan bedienbaar.
 
 De partitie-indeling bevat twee applicatieslots. Firmware 0.3.0 voegt de app-updater en expliciete bootbevestiging toe. De build gebruikt een rollback-enabled bootloader en een uitgestelde Arduino-verificatiehook. Secure boot, onafhankelijke releasehandtekeningen en gegarandeerde recovery bij alle foutsoorten ontbreken. Eerste flash en wijzigingen aan bootloader/partities vragen om fysieke toegang en een gecontroleerde herstelprocedure.
 

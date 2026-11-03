@@ -57,7 +57,7 @@ class SimulatedPanel:
                         height, brightness = request.get("height_mm"), request.get("brightness")
                         valid = (
                             type(height) is int
-                            and 500 <= height <= 1300
+                            and 620 <= height <= 1270
                             and type(brightness) is int
                             and 0 <= brightness <= 100
                         )

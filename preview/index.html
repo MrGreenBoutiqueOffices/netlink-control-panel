@@ -1,77 +1,32 @@
 <!doctype html>
 <html lang="nl">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NetLink paneel · lokale demo</title>
-<style>
-  :root { color-scheme: dark; font: 15px system-ui, sans-serif; background: #101714; color: #eaf2ed }
-  * { box-sizing: border-box }
-  body { margin: 0; min-height: 100vh; padding: 7vh 24px; display: grid; align-content: center; justify-items: center; gap: 30px }
-  main { width: min(100%, 840px) }
-  h1 { font-size: clamp(24px, 4vw, 34px); font-weight: 550; letter-spacing: -.04em; margin: 0 0 10px }
-  p { color: #aabcb2; max-width: 65ch; line-height: 1.6; margin: 0 0 28px }
-  .housing { width: fit-content; max-width: 100%; background: #050907; padding: 14px; border-radius: 19px; box-shadow: 0 30px 70px #0005; overflow-x: auto }
-  .panel { width: 640px; height: 180px; background: #081012; padding: 16px 18px; position: relative; font-family: ui-monospace, monospace }
-  .brand { color: #a1e3b3; font-size: 22px; letter-spacing: .03em }
-  .status { position: absolute; top: 19px; right: 24px; font-size: 16px; color: #b2c8bc }
-  .demo { font-size: 10px; color: #a6b5ac; margin-top: 8px }
-  .height { font-size: 44px; line-height: 1; margin-top: 17px; letter-spacing: -.05em }
-  .height small { font-size: 21px; margin-left: 4px; letter-spacing: 0 }
-  .brightness { margin-top: 15px; font-size: 18px }
-  .buttons { position: absolute; left: 258px; top: 62px; display: flex; gap: 10px }
-  button { font: inherit; cursor: pointer }
-  .buttons button { width: 114px; height: 64px; color: #eaf2ed; border: 0; border-radius: 9px; background: #192b33; font-size: 17px }
-  button:hover { filter: brightness(1.3) }
-  button:focus-visible, input:focus-visible { outline: 2px solid #a1e3b3; outline-offset: 4px }
-  button:disabled { cursor: default; opacity: .4 }
-  #action { position: absolute; left: 258px; top: 146px; color: #aabcb2; font-size: 11px }
-  .controls { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin: 30px 0 16px }
-  .controls button { color: #eaf2ed; background: #27382e; border: 0; border-radius: 8px; padding: 12px 16px }
-  label { display: flex; align-items: center; gap: 12px; color: #c3d0c8 }
-  input { accent-color: #a1e3b3; width: 160px }
-  .footnote { font-size: 12px; margin-bottom: 0 }
-  @media (max-width: 700px) { body { padding: 32px 14px } .housing { border-radius: 12px } }
-</style>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NetLink · interactieve paneelpreview</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
 <main>
-  <h1>Een bedienpaneel voor je werkplek.</h1>
-  <p>Lokale schermdemo op 640 × 180 pixels. De knoppen geven alleen feedback; deze pagina heeft geen verbinding met een bureau, monitor of USB-apparaat.</p>
-  <div class="housing">
-    <div class="panel" aria-label="NetLink paneelvoorbeeld">
-      <div class="brand">NETLINK</div><div class="status" id="status">USB verbonden</div>
-      <div class="demo">DEMO — geen bureau aangesloten</div>
-      <div class="height"><span id="height">74.0</span><small>cm</small></div>
-      <div class="brightness">Monitor <span id="brightness">60</span>%</div>
-      <div class="buttons"><button data-action="sit_preview">ZITTEN</button><button data-action="stand_preview">STAAN</button><button data-action="monitor_preview">MONITOR</button></div>
-      <div id="action" role="status" aria-live="polite">Tik op een knop</div>
-    </div>
-  </div>
-  <div class="controls">
-    <button id="connection" aria-pressed="false">Verbinding verbreken</button>
-    <label>Demohoogte <input id="height-control" aria-label="Demohoogte in millimeters" type="range" min="500" max="1300" value="740" step="10"></label>
-    <label>Monitor <input id="brightness-control" aria-label="Demohelderheid monitor" type="range" min="0" max="100" value="60"></label>
-  </div>
-  <p class="footnote">USB is standaard. Wifi is beschikbaar in de testfirmware. Wifi-updates zitten in de testfirmware; echte bediening en fysieke hersteltests volgen later. De browserpreview staat los van de USB-simulator.</p>
+  <header class="page-heading">
+    <div><p class="eyebrow">NETLINK CONTROL PANEL</p><h1>Je werkplek, binnen handbereik.</h1><p class="intro">Probeer de bediening. Alles is gesimuleerd; er is geen NetLink of bureau aangesloten.</p></div>
+    <span class="demo-badge">Interactieve demo</span>
+  </header>
+  <section class="preview-section" aria-label="Interactief bedienpaneel">
+    <div class="preview-caption"><span id="screen-name">Bureau</span><span>640 × 180 px</span></div>
+    <div class="housing"><div class="screen-viewport"><div id="panel" class="panel" aria-label="NetLink bedienpaneel"></div></div></div>
+    <div class="preview-caption below"><span id="connection-status">Demo verbonden</span><span>Gebruik touch, muis of toetsenbord</span></div>
+  </section>
+  <section class="demo-tools" aria-label="Previewinstellingen">
+    <div class="tool"><label for="scenario">Voorbeeldscherm</label><select id="scenario"><option value="desk">1 · Bureau</option><option value="confirm">2 · Hoogte kiezen</option><option value="moving">3 · Bewegen & stoppen</option><option value="offline">4 · Geen verbinding</option><option value="menu">5 · Meer</option><option value="monitor">6 · Monitor</option><option value="presets">7 · Voorkeuren</option><option value="panel">8 · Paneel</option></select></div>
+    <div class="tool"><label for="demo-height">Demohoogte <output id="demo-height-value">74,0 cm</output></label><input type="range" id="demo-height" min="62" max="127" step="0.1" value="74" aria-label="Demohoogte in centimeters"></div>
+    <div class="tool"><label for="zoom">Weergavegrootte</label><select id="zoom"><option value="1">100% · ware pixelgrootte</option><option value="1.5" selected>150%</option><option value="2">200%</option></select></div>
+    <div class="tool tool-actions"><button id="connection" class="utility">Verbinding verbreken</button><button id="reset" class="utility quiet">Demo herstellen</button></div>
+  </section>
+  <div class="feedback-row"><p id="feedback" role="status" aria-live="polite">Kies Zitten of Staan, of stel met Lager en Hoger een doelhoogte in.</p><button id="motion-pause" class="text-button" hidden>Animatie hervatten</button></div>
+  <footer><span>Ontwerpvoorbeeld · geen echte commando’s</span><span>Esc annuleert of stopt een beweging.</span></footer>
 </main>
-<script>
-  let connected = true;
-  const actions = document.querySelectorAll('[data-action]');
-  const feedback = document.querySelector('#action');
-  actions.forEach(button => button.addEventListener('click', () => {
-    feedback.textContent = button.dataset.action + ' · geen commando verstuurd';
-  }));
-  document.querySelector('#connection').addEventListener('click', event => {
-    connected = !connected;
-    document.querySelector('#status').textContent = connected ? 'USB verbonden' : 'Wacht op USB';
-    event.currentTarget.textContent = connected ? 'Verbinding verbreken' : 'Opnieuw verbinden';
-    event.currentTarget.setAttribute('aria-pressed', String(!connected));
-    actions.forEach(button => button.disabled = !connected);
-    feedback.textContent = connected ? 'USB-test actief' : 'Verbinding verbroken';
-  });
-  document.querySelector('#height-control').addEventListener('input', event => {
-    document.querySelector('#height').textContent = (Number(event.target.value) / 10).toFixed(1);
-  });
-  document.querySelector('#brightness-control').addEventListener('input', event => {
-    document.querySelector('#brightness').textContent = event.target.value;
-  });
-</script>
+</body>
 </html>

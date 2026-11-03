@@ -125,8 +125,8 @@ def main():
                 serial_number=port.serial_number,
             )
         return 0
-    if not 4 <= args.duration <= 3600 or not 500 <= args.height <= 1300 or not 0 <= args.brightness <= 100:
-        parser.error("duration must be 4..3600, height 500..1300 mm, brightness 0..100")
+    if not 4 <= args.duration <= 3600 or not 620 <= args.height <= 1270 or not 0 <= args.brightness <= 100:
+        parser.error("duration must be 4..3600, height 620..1270 mm, brightness 0..100")
     try:
         with SimulatedPanel() if args.simulate else nullcontext() as simulator:
             bench(
