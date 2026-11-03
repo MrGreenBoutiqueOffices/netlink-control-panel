@@ -1,100 +1,115 @@
 # NetLink Panel
 
-Een zelfstandig werkprototype voor de LILYGO T-Display S3 Long. USB is de standaardverbinding; wifi is meteen beschikbaar voor draadloos testen met de Mac.
+Een werkprototype voor de LILYGO T-Display S3 Long: een compact bedienpaneel voor bureau en monitor. De directe USB-koppeling met een NetLink wordt de standaard; wifi blijft optioneel. Beheer en updates op afstand zijn onderdeel van het vervolgwerk.
 
-Dit project bevat een schermdemo, een USB/wifi-benchprogramma voor macOS/Linux, een pseudo-terminalsimulator en testfirmware. Het verstuurt **geen echte bureau- of monitorcommando's**. Wifi en applicatie-updates gebruiken dezelfde versleutelde, met een eigen sleutel geauthenticeerde verbinding. MQTT-integratie en een productiebeheerlaag zijn nog niet geïmplementeerd. Rollback en wifi-updates met automatisch hervatten na verbindingsverlies zijn fysiek getest; zie de teststatus hieronder.
+## Actuele stand — 4 november 2026
 
-## Actuele ontwerp-preview
+Firmware **0.5.2 is via USB geïnstalleerd op het prototype**. De geschreven flashhash is geverifieerd; daarna zijn de draaiende versie, verwachte imagehash, VALID-bootstatus en geslaagde startup-self-check via USB teruggelezen. De fabrieksbackup is bewaard. Dit is bewijs voor installatie en boot, geen volledige fysieke gebruikersacceptatie.
 
-De zelfstandige displaydemo gebruikt de zeventien aangeleverde ontwerpen en lokale voorbeeldwaarden. **Vanaf 0.4.3 wijzigen een korte tik en vasthouden alleen de doelhoogte; pas Bevestigen start de gesimuleerde beweging. De hoogte blijft binnen 62–127 cm.** Firmware **0.5.0 is via USB geïnstalleerd en geverifieerd**. Zie [de bediening en teststatus](docs/display-demo.md).
+| Onderdeel | Stand |
+| --- | --- |
+| Native displaydemo | 17 aangeleverde ontwerpen, volledig lokale simulatie zonder NetLink |
+| Hoogtebediening | Tik kiest 1 cm; hold herhaalt; release houdt de doelhoogte vast; pas Bevestigen start de simulatie; grenzen 62–127 cm |
+| Paneel | Helderheid, dimtijd, 180°-rotatie en versienummer onder Meer → Paneel; instellingen zijn nog tijdelijk in RAM |
+| Firmware 0.5.2 | Herstelt slepen op de helderheidsslider bij 180°-rotatie; regressietest geslaagd |
+| USB/wifi-bench | Mac/Linux-hostprogramma, begrensd JSON-protocol, simulator en geauthenticeerde versleutelde wifi-verbinding |
+| OTA | Dual-slot, hervatten en bootbevestiging/rollback geïmplementeerd; grotere firmwareoverdracht nog onvoldoende betrouwbaar; USB is de huidige installatieroute |
+| Echte bediening | Nog geen NetLink panel-service, MQTT-koppeling of echte bureau-/monitorcommando’s |
+| Beheer en releases | Nog geen productiebeheerlaag of CI; lokale suite van 46 tests, lint, syntaxcontrole en firmwarebuild zijn geslaagd voor de gemergde code |
 
-De 0.4.1-wifi-overdracht bereikte door herhaalde verbindingsuitval het herstelbudget rond 95%. Het eerdere succesvolle 0.3.3-herstelbewijs is daarmee geen algemene OTA-acceptatie voor de grotere demoimage. De huidige installatieroute is USB.
+De lokale demo blijft bedienbaar zonder beheersessie. Monitorfuncties, voorkeuren, fouten en afstellen zijn voorbeeldgedrag, geen aansturing of detectie van echte apparatuur. De ingestelde paneelhelderheid schaalt de gerenderde pixels; fysieke backlightregeling is nog niet aangetoond.
 
-## Firmware-updates zonder USB
+Zie [bediening en installatiegeschiedenis](docs/display-demo.md), [visuele QA](design-qa.md) en [de ontwerpen](docs/design/netlink-bedienpaneel.pdf). Eerdere bench- en OTA-rapporten bevatten historische resultaten; de tabel hierboven geeft de actuele projectstatus.
 
-Installeer de updater in firmware 0.3.0 één keer via USB. Daarna kun je nieuwe builds draadloos sturen:
+## Demo proberen
 
-```sh
-uv tool run --from platformio==6.1.18 pio run --project-dir firmware
-uv run panel wifi update
-```
+Op het display: Meer opent Monitor, Voorkeuren en Paneel. Pijlen en presets kiezen alleen een doelhoogte. Annuleren verwerpt de keuze; Bevestigen start een lokale beweging. Een aanraking tijdens die beweging stopt de simulatie. De eerste aanraking na ruststand wekt alleen het scherm.
 
-Stop eerst een draaiende `panel wifi serve`. De updater wacht op het gekoppelde paneel, schrijft naar het andere applicatieslot en meldt pas succes na een geverifieerde reboot en bootbevestiging. Zie [docs/ota.md](docs/ota.md) voor de volledige procedure, beperkingen en herstelgedrag.
+Extra ontwerpscenario’s: houd in Meer het lege vak rechtsonder minimaal één seconde vast. Houd in de statusvoorbeelden links vast om verder te bladeren. Er is geen automatische schermcarrousel.
 
-## Meteen via wifi testen
+Zonder display: open `preview/index.html`. De browserpreview bevat de eerdere acht schermen en staat los van USB, firmware en echte apparatuur. De native displaydemo is de primaire implementatie van de nieuwste 17 schermen.
 
-Na de eerste firmware-installatie stel je wifi eenmalig via USB in. Daarna heeft het paneel alleen voeding nodig:
+## Ontwikkelen en controleren
 
-```sh
-uv run panel wifi setup --port <usb-poort> --host <ip-van-je-mac>
-uv run panel wifi serve --duration 300 --height 740 --brightness 60
-```
-
-Wifi-naam en wachtwoord worden interactief gevraagd. Lees [docs/wifi.md](docs/wifi.md) voor de volledige stappen, pairing, USB-voorrang en het wissen van instellingen. Er worden geen credentials in de firmwarebron gezet.
-
-## Beginnen zonder display
-
-Open `preview/index.html` in een browser voor de interactieve schermdemo. De afmetingen van het paneel zijn 640 × 180 pixels. Verbreek de demoverbinding om de uitgeschakelde knoppen te bekijken. De preview staat los van USB en de simulator.
-
-Installeer [uv](https://docs.astral.sh/uv/getting-started/installation/) als het nog niet beschikbaar is. Voer vanuit deze projectmap uit:
+Installeer [uv](https://docs.astral.sh/uv/getting-started/installation/) en voer vanuit de projectmap uit:
 
 ```sh
+uv sync
 uv run panel bench --simulate
 uv run python -m unittest discover -s tests -v
+uv tool run --from ruff ruff check .
+uv tool run --from ruff ruff format --check .
+node --check preview/app.js
 ```
 
-De simulator gebruikt een echt pseudo-terminalpaar, zodat ook de seriële hostcode wordt getest. Een geslaagde proef vereist een geldige identiteit/handshake, een bevestiging van de demostatus en ten minste één heartbeat. De uitvoer vermeldt expliciet `simulated: true` en `hardware_command_sent: false`.
-
-## USB-apparaat bekijken
-
-```sh
-uv run panel ports
-```
-
-Dit toont beschikbare seriële apparaten zonder ze te openen. De fabrieksfirmware spreekt ons protocol nog niet: `bench` zal daarop geen geslaagde proef rapporteren. Eerst moeten we het bord identificeren, de fabrieksflash veiligstellen en display/touch-revisie controleren.
-
-De LILYGO kan via USB-programmeermodus tijdelijk onder een andere poortnaam verschijnen. Kies altijd expliciet het bedoelde apparaat. Een seriële poort openen kan het bord resetten; het benchprogramma schrijft geen flash.
+De tests omvatten framing, sessies, TLS, updateherstel en de echte native C++-toestandsmachine/renderer. De simulator gebruikt een pseudo-terminalpaar en verstuurt geen hardwarecommando’s. Geslaagde softwaretests vervangen geen fysieke acceptatie van voeding, touch, beweging, radio of herstel.
 
 ## Firmware bouwen
-
-De benchfirmware gebruikt tijdelijk de Arduino/ESP-IDF-basis en GFX-driver van de fabrikant. Dat houdt de eerste hardwareproef dicht bij de referentievoorbeelden. Applicatie-updates en bootbevestiging/rollback zijn geïmplementeerd met ESP-IDF. LVGL en onafhankelijke releasehandtekeningen blijven vervolgwerk; dit is geen vervanging van de volledige productarchitectuur.
 
 ```sh
 uv run python scripts/prepare_firmware.py
 uv tool run --from platformio==6.1.18 pio run --project-dir firmware
 ```
 
-De voorbereidingsstap haalt alleen de benodigde borddefinitie, GFX-library en CST3530-touchdriver uit een vaste [officiële LILYGO-revisie](https://github.com/Xinyuan-LilyGO/T-Display-S3-Long/tree/3deece89098f25e7d155e41e4e0f5dd8b368ab02). Bronnen en licentievermeldingen blijven in de genegeerde map `firmware/.vendor/`. De enige lokale driverwijziging schakelt automatisch bijwerken van de **touchcontrollerfirmware** uit. Afhankelijkheden worden bij de eerste build lokaal gedownload.
+De voorbereiding haalt borddefinitie, GFX-library en CST3530-driver uit een vaste [officiële LILYGO-revisie](https://github.com/Xinyuan-LilyGO/T-Display-S3-Long/tree/3deece89098f25e7d155e41e4e0f5dd8b368ab02). Automatisch bijwerken van de touchcontrollerfirmware is uitgeschakeld. De huidige implementatie gebruikt Arduino/ESP-IDF met een eigen native renderer; er is geen LVGL-migratie nodig om de huidige demo te gebruiken.
 
-De schermcontroller krijgt een volledig 180 × 640-frame, met softwarematige rotatie naar een horizontale bediening. Er wordt niet op hardwarematige rotatie vertrouwd. De CST3530-pinconfiguratie is een kandidaat op basis van de referentiebranch en moet op het aangekochte bord worden gecontroleerd.
+De logische framebuffer is 640 × 180 en wordt in software naar het fysieke 180 × 640-frame vertaald. De CST3530-touchmapping is op het huidige prototype gebruikt en getest; andere boardrevisies vereisen eigen verificatie.
 
-Er wordt niets automatisch geflasht. Na identificatie en een backup kan de testfirmware handmatig worden geladen met de expliciete apparaatpoort:
+De firmwareversie staat in `firmware/src/panel_version.h`; scherm, handshake en image-marker gebruiken diezelfde bron. Generated assets staan in de repository. Alleen bij ontwerpwijzigingen opnieuw genereren:
 
 ```sh
-uv tool run --from platformio==6.1.18 pio run --project-dir firmware --target upload --upload-port <poort>
-uv run panel bench --port <poort> --duration 30 --height 740 --brightness 60
+uv run scripts/generate_demo_assets.py
 ```
 
-De firmware toont steeds dat de waarden demo zijn. `--brightness` verandert alleen de getoonde monitorwaarde; het regelt geen echte monitor of schermbacklight. De huidige zelfstandige demo reageert lokaal op de touchbediening; zie de actuele bedieningsbeschrijving hierboven. De beheersessie bewaakt zijn host-heartbeat; de lokale demo blijft onafhankelijk daarvan bedienbaar.
+## USB-installatie en herstel
 
-De partitie-indeling bevat twee applicatieslots. Firmware 0.3.0 voegt de app-updater en expliciete bootbevestiging toe. De build gebruikt een rollback-enabled bootloader en een uitgestelde Arduino-verificatiehook. Secure boot, onafhankelijke releasehandtekeningen en gegarandeerde recovery bij alle foutsoorten ontbreken. Eerste flash en wijzigingen aan bootloader/partities vragen om fysieke toegang en een gecontroleerde herstelprocedure.
+```sh
+uv run panel ports
+```
+
+Identificeer het bedoelde paneel via USB-identiteit én handshake. Poortnamen kunnen na reboot of programmeermodus veranderen; vertrouw niet op één vast poortnummer. Een seriële poort openen kan het apparaat resetten.
+
+Voor het huidige prototype is alleen de applicatie in het vooraf gecontroleerde actieve slot geschreven. Controleer vóór schrijven apparaatidentiteit, fabrieksbackup, imageprofiel en bootselectie. Gebruik niet blind een volledig upload-/erasecommando: bootloader, partities en NVS behoren niet tot een gewone applicatie-update. De private backup, pairing en installatierapporten staan buiten Git.
+
+USB-flashing is nu de gekozen installatie-/herstelroute. Een beheerde USB-app-update via de toekomstige NetLink panel-service moet nog worden gebouwd. Een merge of build installeert niets op het display.
+
+## Optionele wifi en OTA
+
+Wifi testen met de Mac kan al. Configureer eenmalig via USB:
+
+```sh
+uv run panel wifi setup --port <usb-poort> --host <ip-van-je-mac>
+uv run panel wifi serve --duration 300 --height 740 --brightness 60
+```
+
+Netwerknaam en wachtwoord worden interactief gevraagd. De firmware bewaart configuratie in NVS; credentials komen niet in de firmwarebron. De bench gebruikt een eigen TLS-PSK-sleutel. NVS/flash is nog niet versleuteld. Zie [wifi-procedure en beperkingen](docs/wifi.md).
+
+De bestaande `uv run panel wifi update` schrijft naar het inactieve applicatieslot en controleert na reboot de image en bootbevestiging. Hervatten na verbindingsverlies en rollback zijn fysiek aangetoond bij eerdere firmware. De grotere 0.4.1-overdracht bereikte echter het reconnectbudget rond 95%; dat eerdere bewijs is dus geen algemene OTA-acceptatie. Gebruik voorlopig USB voor installatie van de huidige demoimage. Zie [OTA-procedure](docs/ota.md) en de [actuele displayteststatus](docs/display-demo.md).
+
+Onafhankelijke releasehandtekeningen, secure boot, herstel bij alle stroom-/netwerkfouten en onbeheerde recovery zijn nog niet geaccepteerd. Wifi naar een echte NetLink, transportwissel en beheer zonder Mac zijn vervolgwerk.
+
+## Vervolgwerk
+
+De [GitHub-epics](https://github.com/MrGreenBoutiqueOffices/netlink-control-panel/issues?q=is%3Aissue%20is%3Aopen%20label%3Aepic) bevatten de concrete werkpakketten, acceptatiecriteria en afhankelijkheden:
+
+1. [Directe USB-koppeling](https://github.com/MrGreenBoutiqueOffices/netlink-control-panel/issues/2): productieprotocol, panel-service en bestaande lokale MQTT-services.
+2. [Echte bediening](https://github.com/MrGreenBoutiqueOffices/netlink-control-panel/issues/3): werkelijke status, blijvende instellingen en fysieke stop-/bedieningsacceptatie.
+3. [Betrouwbare updates](https://github.com/MrGreenBoutiqueOffices/netlink-control-panel/issues/4): grotere images, gecontroleerde ondertekende releases en herstelproeven.
+4. [Optionele wifi](https://github.com/MrGreenBoutiqueOffices/netlink-control-panel/issues/5): provisioning, pairing, transportkeuze en herstel zonder USB.
+5. [Beheer op afstand](https://github.com/MrGreenBoutiqueOffices/netlink-control-panel/issues/6): agentintegratie, geautoriseerde acties en bestaande logs/metrics.
+6. [Releases en pilot](https://github.com/MrGreenBoutiqueOffices/netlink-control-panel/issues/7): CI, installatie/montage en meerdaagse acceptatie op echte werkplekken.
+
+Begin met het protocol en de USB-service; werk parallel aan OTA-diagnose en CI. Test daarna één echte werkplek voordat brede uitrol volgt. Boekingen, check-in en persoonlijke profielen vallen buiten deze eerste scope.
+
+[De oorspronkelijke productplanning](docs/product-plan.md) is achtergrond bij de architectuur en bevat nog aannames uit de fase vóór het prototype. De actuele status en GitHub-issues gaan voor op die historische fasering. Integratie moet de bestaande NetLink desk/display-services en fleet-first Balena-releaseflow gebruiken. Stack-, agent- of desk-servicewijzigingen horen in hun eigen repositories; deze repository bevat firmware en hostprototype.
 
 ## Mappen
 
 | Map | Inhoud |
 | --- | --- |
-| `firmware/` | ESP32-S3 testfirmware, vaste buildconfiguratie en partities |
-| `host/netlink_panel/` | USB-bench, begrensde protocoldecoder en simulator |
-| `preview/` | Zelfstandige interactieve schermdemo |
-| `tests/` | Framing-, foutafhandeling- en seriële integratietests |
-| `docs/` | Protocol, status en eerstvolgende hardwareproeven |
-
-## Vervolg
-
-1. USB-identiteit, bordrevisie en fabrieksfirmware vastleggen; volledige flashbackup controleren voordat we overschrijven.
-2. Testfirmware laden en schermoriëntatie, touchcoördinaten, USB-serial en hotplug fysiek testen.
-3. De geïmplementeerde wifi-update en bootbevestiging fysiek aantonen, ook bij verbindingsverlies of stroomuitval.
-4. Daarna pas capability-gebaseerde koppeling met bestaande NetLink MQTT-aansturing bouwen en stopgedrag op echte hardware testen.
-5. Wifi gebruikt hetzelfde applicatieprotocol; test radioverbinding, transportwissel en herstel ook op het fysieke paneel. De app-updater gebruikt wifi; USB blijft de herstel- en installatieroute.
-
-Een kopie van de volledige productplanning staat in [docs/product-plan.md](docs/product-plan.md); de oorspronkelijke planning staat in `netlink_balena/docs/planning/hardware/usb-control-panel.md`. Dit project wijzigt de NetLink-stack of bestaande submodulepointers niet.
+| `firmware/` | ESP32-S3-firmware, native demo en updatecode |
+| `host/netlink_panel/` | USB/wifi-bench, updater, protocoldecoder en simulator |
+| `preview/` | Browserdemo van de eerdere ontwerpset |
+| `tests/` | Python-, native renderer-, protocol- en hersteltests |
+| `scripts/` | Firmwarevoorbereiding, assetgeneratie en diagnostische captures |
+| `docs/` | Ontwerpen, gebruik, historische testresultaten en planning |
