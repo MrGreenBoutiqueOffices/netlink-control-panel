@@ -11,8 +11,11 @@
 #include "panel_ota.h"
 #include "frame_writer.h"
 #include "session_timeout.h"
+#include "panel_demo.h"
+#include <mbedtls/base64.h>
 
 PanelOta ota;
+PanelDemo demo;
 char otaStatus[40] = {};
 
 bool startupHealthy();
@@ -33,6 +36,9 @@ volatile uint16_t lastWifiDisconnectReason = 0;
 int lastRenderedOtaPercent = -1;
 wl_status_t previousWifiStatus = WL_NO_SHIELD;
 uint16_t *nativePixels = nullptr;
+uint16_t *demoSnapshot = nullptr;
+uint32_t demoSnapshotId = 0;
+const char *demoSnapshotScreen = "";
 bool screenReady = false, linked = false, hadTouch = true;
 uint32_t lastHost = 0, lastHeartbeat = 0, lastTouchPoll = 0;
 int demoHeight = 740, demoBrightness = 60;
@@ -51,7 +57,6 @@ void releaseSession(bool preserveTransfer = false) {
   if (!preserveTransfer) ota.abort();
   linked = false;
   active = Transport::None;
-  hadTouch = true;
   wifiClient.stop();
   wifiInbox = Inbox{};
   lastAction = "Verbinding verbroken";
@@ -75,31 +80,10 @@ void ack(Transport source, int id, bool ok) {
 
 void render() {
   if (!screenReady) return;
-  canvas.fillScreen(BG);
-  canvas.setTextWrap(false);
-  canvas.setTextSize(2); canvas.setTextColor(PANEL_ACCENT);
-  canvas.setCursor(18, 16); canvas.print("NETLINK");
-  canvas.setTextColor(MUTED); canvas.setCursor(410, 16);
-  canvas.print(linked ? (active == Transport::USB ? "USB verbonden" : "Wifi verbonden") :
-               (wifiEnabled ? (WiFi.status() == WL_CONNECTED ? "Wifi gereed" : "Wifi zoeken") : "Wacht op USB"));
-  canvas.setTextSize(1); canvas.setCursor(18, 42);
-  canvas.print("DEMO - geen bureau aangesloten");
-  canvas.setTextColor(FG); canvas.setTextSize(4); canvas.setCursor(18, 70);
-  canvas.printf("%.1f", demoHeight / 10.0);
-  canvas.setTextSize(2); canvas.print(" cm");
-  canvas.setCursor(18, 134); canvas.printf("Monitor %d%%", demoBrightness);
-  canvas.setTextSize(1); canvas.setTextColor(MUTED); canvas.setCursor(18, 162);
-  if (wifiEnabled && WiFi.status() == WL_CONNECTED) canvas.print(WiFi.localIP().toString());
-  const char *labels[] = {"ZITTEN", "STAAN", "MONITOR"};
-  bool controlsEnabled = linked && !ota.receiving() && !ota.committed() && !ota.pending();
-  for (int i = 0; i < 3; i++) {
-    int x = 258 + i * 124;
-    canvas.fillRoundRect(x, 62, 114, 64, 9, controlsEnabled ? 0x1946 : 0x1083);
-    canvas.setCursor(x + 12, 86); canvas.setTextSize(2);
-    canvas.setTextColor(controlsEnabled ? FG : MUTED); canvas.print(labels[i]);
+  demo.draw(canvas.getFramebuffer());
+  if (ota.receiving() || ota.pending() || ota.committed()) {
+    demo.drawStatus(canvas.getFramebuffer(), ota.committed()?PanelDemo::Updated:PanelDemo::Updating, ota.receiving()?ota.percent():100, ota.pending());
   }
-  canvas.setTextSize(1); canvas.setTextColor(MUTED); canvas.setCursor(258, 146);
-  canvas.print(lastAction);
   // AXS15231B has no hardware axis swap. Flush a complete native frame.
   uint16_t *pixels = canvas.getFramebuffer();
   for (int y = 0; y < HEIGHT; y++)
@@ -164,7 +148,7 @@ void receive(Transport source, const char *line) {
   if (!strcmp(type, "hello")) {
     if (!canHandshake(active, source)) { ack(source, id, false); return; }
     if (source == Transport::USB && (active == Transport::Wifi || ota.receiving())) releaseSession();
-    active = source; linked = true; lastHost = millis(); hadTouch = true;
+    active = source; linked = true; lastHost = millis();
     StaticJsonDocument<2048> response;
     response["type"] = "hello"; response["id"] = id; response["panel_id"] = panelId;
     response["firmware"] = PANEL_FIRMWARE_VERSION; response["simulated"] = false;
@@ -172,7 +156,7 @@ void receive(Transport source, const char *line) {
     response["transport"] = source == Transport::USB ? "usb" : "wifi";
     JsonArray capabilities = response["capabilities"].to<JsonArray>();
     capabilities.add("demo_state"); capabilities.add("wifi_provision"); capabilities.add("tls_psk");
-    capabilities.add("ota_v1"); capabilities.add("ota_resume_v1");
+    capabilities.add("ota_v1"); capabilities.add("ota_resume_v1"); capabilities.add("demo_ui_v1"); capabilities.add("frame_snapshot_v1");
     response["self_test_ok"] = startupHealthy();
     response["uptime_ms"] = millis();
     response["reset_reason"] = static_cast<int>(esp_reset_reason());
@@ -204,6 +188,45 @@ void receive(Transport source, const char *line) {
     }
   } else if (ota.receiving() || ota.pending()) {
     ack(source, id, false);
+  } else if (!strcmp(type, "demo_ui")) {
+    const char *op = message["op"] | "status";
+    bool ok = true;
+    if (!strcmp(op, "scene")) ok = message["scene"].is<int>() && demo.scene(message["scene"], millis());
+    else if (!strcmp(op, "tap") || !strcmp(op, "press") || !strcmp(op, "drag")) {
+      int x = message["x"] | -1, y = message["y"] | -1, held = message["held_ms"] | 80;
+      ok = message["x"].is<int>() && message["y"].is<int>() && x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT && held >= 30 && held <= 2500;
+      if (ok) {
+        if (!strcmp(op, "press")) demo.touchDown(x, y, millis());
+        else if (!strcmp(op, "drag")) demo.touchMove(x, y, millis());
+        else { demo.touchDown(x, y, millis() - held); demo.touchUp(millis()); }
+      }
+    } else if (!strcmp(op, "release")) demo.touchUp(millis());
+    else if (!strcmp(op, "reset")) demo.scene(0, millis());
+    else if (!strcmp(op, "height")) { int mm = message["height_mm"] | -1; ok = message["height_mm"].is<int>() && PanelDemo::validHeight(mm); if(ok) demo.setHeight(mm); }
+    else if (strcmp(op, "status")) ok = false;
+    if (ok && strcmp(op, "status")) render();
+    StaticJsonDocument<384> response; response["type"] = "ack"; response["id"] = id; response["ok"] = ok;
+    response["mode"] = "standalone_demo"; response["screen"] = demo.name(); response["height_mm"] = demo.height; response["target_mm"] = demo.target;
+    response["min_height_mm"] = PanelDemo::MinHeightMm; response["max_height_mm"] = PanelDemo::MaxHeightMm;
+    response["sit_mm"] = demo.sit; response["stand_mm"] = demo.stand; response["monitor"] = demo.monitor;
+    response["brightness"] = demo.brightness; response["rotated"] = demo.rotated; response["connected"] = demo.connected;
+    sendTo(source, response); lastHost = millis();
+  } else if (!strcmp(type, "demo_frame")) {
+    int offset = message["offset"] | -1;
+    if (!message["offset"].is<int>() || offset < 0 || offset >= WIDTH * HEIGHT * 2 || offset % 512) { ack(source, id, false); return; }
+    if (!offset) {
+      if (!demoSnapshot) demoSnapshot = static_cast<uint16_t *>(ps_malloc(WIDTH * HEIGHT * 2));
+      if (!demoSnapshot) { ack(source, id, false); return; }
+      render(); memcpy(demoSnapshot, canvas.getFramebuffer(), WIDTH * HEIGHT * 2);
+      ++demoSnapshotId; demoSnapshotScreen = demo.name();
+    }
+    if (!demoSnapshot) { ack(source, id, false); return; }
+    size_t length = min(512, WIDTH * HEIGHT * 2 - offset), encoded = 0; unsigned char data[685];
+    bool ok = mbedtls_base64_encode(data, sizeof(data), &encoded, reinterpret_cast<uint8_t *>(demoSnapshot) + offset, length) == 0;
+    data[encoded] = 0;
+    StaticJsonDocument<1024> response; response["type"] = "ack"; response["id"] = id; response["ok"] = ok;
+    response["offset"] = offset; response["format"] = "rgb565le"; response["snapshot_id"] = demoSnapshotId; response["snapshot_screen"] = demoSnapshotScreen; response["data"] = reinterpret_cast<const char *>(data);
+    sendTo(source, response); lastHost = millis();
   } else if (!strcmp(type, "wifi_config") && source == Transport::USB) {
     if (!validWifi(message)) { ack(source, id, false); return; }
     // Persist one NVS blob, excluding protocol fields. Never echo credentials.
@@ -219,8 +242,8 @@ void receive(Transport source, const char *line) {
   } else if (!strcmp(type, "demo_state")) {
     bool valid = screenReady && message["height_mm"].is<int>() && message["brightness"].is<int>();
     int h = message["height_mm"], b = message["brightness"];
-    valid = valid && h >= 500 && h <= 1300 && b >= 0 && b <= 100;
-    if (valid) { demoHeight = h; demoBrightness = b; render(); }
+    valid = valid && PanelDemo::validHeight(h) && b >= 0 && b <= 100;
+    if (valid) { demoHeight = h; demoBrightness = b; demo.setHeight(h); demo.monitor = b; render(); }
     ack(source, id, valid);
   } else { ack(source, id, false); }
 }
@@ -239,7 +262,11 @@ void readStream(Stream &stream, Inbox &inbox, Transport source) {
 }
 
 void setup() {
+  // Reserve enough USB TX space for complete 1025-byte JSON frames.
+  // The default 256-byte queue can truncate a bulk response.
+  Serial.setTxBufferSize(4096);
   Serial.begin(115200);
+  Serial.setTxTimeoutMs(100);
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
     if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) lastWifiDisconnectReason = info.wifi_sta_disconnected.reason;
   });
@@ -248,9 +275,11 @@ void setup() {
   pinMode(1, OUTPUT); digitalWrite(1, LOW);
   nativePixels = static_cast<uint16_t *>(ps_malloc(WIDTH * HEIGHT * sizeof(uint16_t)));
   screenReady = nativePixels && canvas.begin() && display.begin(32000000);
+  if(screenReady) { digitalWrite(1,HIGH);demo.screen=PanelDemo::Boot;render(); }
   touch_init(15, 10, 11, 2); // Verify actual CST3530 board revision before flashing.
   digitalWrite(1, HIGH);
   if (preferences.begin("panel-wifi", false)) applyWifi();
+  demo.scene(0,millis());
   render();
 }
 
@@ -267,7 +296,7 @@ void loop() {
     if (status != previousWifiStatus) { previousWifiStatus = status; render(); }
     if (status != WL_CONNECTED && now - lastWifiRetry > 15000) { lastWifiRetry = now; WiFi.reconnect(); }
     // Bounded TLS attempts only while no USB or Wi-Fi control session exists.
-    if (status == WL_CONNECTED && active == Transport::None && !wifiClient.connected() && now - lastTLSRetry > 5000) {
+    if (status == WL_CONNECTED && active == Transport::None && demo.screen != PanelDemo::Moving && !wifiClient.connected() && now - lastTLSRetry > 5000) {
       lastTLSRetry = now;
       wifiClient.connect(serverAddress, serverPort, 1000);
       wifiInbox = Inbox{};
@@ -285,16 +314,20 @@ void loop() {
     lastTouchPoll = now;
     hyn_ts_data *touch = get_touch_data();
     bool pressed = touch && touch->rp_buf.rep_num > 0;
-    if (linked && !ota.receiving() && !ota.pending() && !ota.committed() && pressed && !hadTouch) {
+    demo.setBusy(ota.receiving() || ota.pending() || ota.committed());
+    if (pressed && !hadTouch) {
       int x = touch->rp_buf.pos_info[0].pos_y, y = 179 - touch->rp_buf.pos_info[0].pos_x;
-      int button = (x - 258) / 124;
-      if (x >= 258 && button >= 0 && button < 3 && x < 258 + button * 124 + 114 && y >= 62 && y < 126) {
-        const char *actions[] = {"sit_preview", "stand_preview", "monitor_preview"};
-        StaticJsonDocument<128> event; event["type"] = "touch"; event["action"] = actions[button];
-        sendTo(active, event); lastAction = actions[button]; render();
+      demo.touchDown(x, y, now);
+      if (linked && !demo.busy) {
+        StaticJsonDocument<160> event; event["type"] = "touch"; event["action"] = "demo_touch";
+        event["x"] = x; event["y"] = y; sendTo(active, event);
       }
     }
+    if (pressed && hadTouch) demo.touchMove(touch->rp_buf.pos_info[0].pos_y, 179 - touch->rp_buf.pos_info[0].pos_x, now);
+    if (!pressed && hadTouch) demo.touchUp(now);
     hadTouch = pressed;
   }
+  demo.setBusy(ota.receiving() || ota.pending() || ota.committed());
+  if (demo.tick(millis())) render();
   delay(1);
 }

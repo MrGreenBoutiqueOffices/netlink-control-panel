@@ -6,9 +6,7 @@
 #include <mbedtls/sha256.h>
 #include "ota_policy.h"
 
-#ifndef PANEL_FIRMWARE_VERSION
-#define PANEL_FIRMWARE_VERSION "0.3.3"
-#endif
+#include "panel_version.h"
 #define PANEL_OTA_PROFILE "lilygo-s3-long-cst3530:p1:ota3m-v1"
 
 class PanelOta {

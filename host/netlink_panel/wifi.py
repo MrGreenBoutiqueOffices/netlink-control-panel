@@ -233,6 +233,6 @@ def run_wifi(args):
         return 0
     if not 4 <= args.duration <= 3600 or not 4 <= args.session_duration <= 3600:
         raise ValueError("Durations must be 4..3600 seconds")
-    if not 500 <= args.height <= 1300 or not 0 <= args.brightness <= 100:
-        raise ValueError("Height must be 500..1300 mm and brightness 0..100")
+    if not 620 <= args.height <= 1270 or not 0 <= args.brightness <= 100:
+        raise ValueError("Height must be 620..1270 mm and brightness 0..100")
     return serve(args)
