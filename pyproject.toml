@@ -1,0 +1,24 @@
+[project]
+name = "netlink-panel"
+version = "0.3.3"
+description = "USB and authenticated Wi-Fi bench prototype for the NetLink LILYGO control panel"
+requires-python = ">=3.11"
+dependencies = ["pyserial==3.5"]
+
+[project.scripts]
+panel = "netlink_panel.cli:main"
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["host/netlink_panel"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = ["firmware/.vendor", "firmware/.pio"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

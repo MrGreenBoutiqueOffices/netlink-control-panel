@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.ruff_cache/
+.secrets/
+firmware/.pio/
+firmware/.vendor/
+.platformio/
+artifacts/
