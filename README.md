@@ -4,18 +4,18 @@ Een werkprototype voor de LILYGO T-Display S3 Long: een compact bedienpaneel voo
 
 ## Actuele stand — 4 november 2026
 
-Firmware **0.5.2 is via USB geïnstalleerd op het prototype**. De geschreven flashhash is geverifieerd; daarna zijn de draaiende versie, verwachte imagehash, VALID-bootstatus en geslaagde startup-self-check via USB teruggelezen. De fabrieksbackup is bewaard. Dit is bewijs voor installatie en boot, geen volledige fysieke gebruikersacceptatie.
+Firmware **0.8.0 uit broncommit `e8d2232` is via USB geïnstalleerd op het prototype**. De flashhash en daarna de draaiende versie, imagehash, VALID-bootstatus en display/touch-startupcontrole zijn geverifieerd. Na opnieuw aansluiten werkte USB weer. De fabrieksbackup is behouden. De gebruiker test de pijlfeedback en instellingen; volledige fysieke acceptatie staat nog open. Een nieuwe CI-build of merge installeert niets op het display.
 
 | Onderdeel | Stand |
 | --- | --- |
 | Native displaydemo | 17 aangeleverde ontwerpen, volledig lokale simulatie zonder NetLink |
 | Hoogtebediening | Tik kiest 1 cm; hold herhaalt; release houdt de doelhoogte vast; pas Bevestigen start de simulatie; grenzen 62–127 cm |
-| Paneel | Helderheid, dimtijd, 180°-rotatie en versienummer onder Meer → Paneel; lokale instellingen worden vanaf bronversie 0.8.0 gevalideerd en over herstarts bewaard (nog niet geïnstalleerd) |
-| Firmware 0.5.2 | Herstelt slepen op de helderheidsslider bij 180°-rotatie; regressietest geslaagd |
+| Paneel | Helderheid, dimtijd, 180°-rotatie en versienummer onder Meer → Paneel; lokale instellingen worden vanaf 0.8.0 gevalideerd en over herstarts bewaard; fysieke gebruikersacceptatie loopt |
+| Firmware 0.8.0 | Herstelt de pijl-drukkleur na loslaten en voegt blijvende lokale paneelinstellingen toe |
 | USB/wifi-bench | Mac/Linux-hostprogramma, begrensd JSON-protocol, simulator en geauthenticeerde versleutelde wifi-verbinding |
 | OTA | Dual-slot, hervatten en bootbevestiging/rollback geïmplementeerd; grotere firmwareoverdracht nog onvoldoende betrouwbaar; USB is de huidige installatieroute |
 | Echte bediening | Nog geen NetLink panel-service, MQTT-koppeling of echte bureau-/monitorcommando’s |
-| Beheer en releases | Nog geen productiebeheerlaag of CI; lokale suite van 46 tests, lint, syntaxcontrole en firmwarebuild zijn geslaagd voor de gemergde code |
+| Beheer en releases | PR-/main-controles en commitgebonden firmware-/protocolartifacts; versietags maken na controle een draft-release. Geen automatische flash of fleetdeploy; zie [releaseprocedure](docs/releases.md) |
 
 De lokale demo blijft bedienbaar zonder beheersessie. Monitorfuncties, voorkeuren, fouten en afstellen zijn voorbeeldgedrag, geen aansturing of detectie van echte apparatuur. De ingestelde paneelhelderheid schaalt de gerenderde pixels; fysieke backlightregeling is nog niet aangetoond.
 
@@ -23,9 +23,9 @@ Zie [bediening en installatiegeschiedenis](docs/display-demo.md), [visuele QA](d
 
 ## Read-only statuspad (0.7.0 gemerged)
 
-De nieuwe firmwarecapability kan echte hoogte en geselecteerde monitorstatus vanuit `netlink-webserver` tonen. Er is geen Dell-monitor vereist; een Waveshare of een bureau zonder monitor blijft bruikbaar. Waarnemingen, laatst bekende waarden en onbekende status zijn onderscheiden. Alle apparaatbediening blijft geblokkeerd. Dit is gemerged en gebouwd/getest, nog niet op het fysieke display geïnstalleerd. Zie [het statuscontract](docs/production-protocol.md).
+De nieuwe firmwarecapability kan echte hoogte en geselecteerde monitorstatus vanuit `netlink-webserver` tonen. Er is geen Dell-monitor vereist; een Waveshare of een bureau zonder monitor blijft bruikbaar. Waarnemingen, laatst bekende waarden en onbekende status zijn onderscheiden. Alle apparaatbediening blijft geblokkeerd. De firmwareondersteuning zit in de geïnstalleerde 0.8.0; de webserverintegratie wacht nog op review en is niet fysiek met een NetLink geaccepteerd. Zie [het statuscontract](docs/production-protocol.md).
 
-## Firmware 0.8.0 in ontwikkeling
+## Lokale paneelinstellingen in 0.8.0
 
 Pijlknoppen tonen hun drukkleur alleen tijdens de aanraking; na loslaten blijven de gekozen doelhoogte en bevestiging staan. Fysieke wijzigingen van helderheid, dimtijd en rotatie worden bij loslaten opgeslagen, met schema, revisie en een vorige geldige configuratie als herstelpunt. Een mislukte opslag herstelt de eerder opgeslagen instellingen. De productie-status bevat alleen de opgeslagen configuratie en eventuele opslagfout; beheerde wijzigingen blijven geblokkeerd. Bureaupresets en wifi-credentials vallen buiten deze UI-configuratie. Zie [opslag, eigenaarschap en verificatie](docs/panel-settings.md).
 
@@ -42,13 +42,15 @@ Zonder display: open `preview/index.html`. De browserpreview bevat de eerdere ac
 Installeer [uv](https://docs.astral.sh/uv/getting-started/installation/) en voer vanuit de projectmap uit:
 
 ```sh
-uv sync
+uv sync --locked --group dev
 uv run panel bench --simulate
 uv run python -m unittest discover -s tests -v
-uv tool run --from ruff ruff check .
-uv tool run --from ruff ruff format --check .
+uv run --locked ruff check .
+uv run --locked ruff format --check .
 node --check preview/app.js
 ```
+
+De CI draait hetzelfde pad met [gevalideerde artifacts en een versiegrens voor de webserver](docs/releases.md). Generated assets kunnen zonder checkoutwijziging worden gecontroleerd met `uv run --locked python scripts/generate_demo_assets.py --check`.
 
 De tests omvatten framing, sessies, TLS, updateherstel en de echte native C++-toestandsmachine/renderer. De simulator gebruikt een pseudo-terminalpaar en verstuurt geen hardwarecommando’s. Geslaagde softwaretests vervangen geen fysieke acceptatie van voeding, touch, beweging, radio of herstel.
 
@@ -56,7 +58,7 @@ De tests omvatten framing, sessies, TLS, updateherstel en de echte native C++-to
 
 ```sh
 uv run python scripts/prepare_firmware.py
-uv tool run --from platformio==6.1.18 pio run --project-dir firmware
+uv run --locked pio run --project-dir firmware
 ```
 
 De voorbereiding haalt borddefinitie, GFX-library en CST3530-driver uit een vaste [officiële LILYGO-revisie](https://github.com/Xinyuan-LilyGO/T-Display-S3-Long/tree/3deece89098f25e7d155e41e4e0f5dd8b368ab02). Automatisch bijwerken van de touchcontrollerfirmware is uitgeschakeld. De huidige implementatie gebruikt Arduino/ESP-IDF met een eigen native renderer; er is geen LVGL-migratie nodig om de huidige demo te gebruiken.
@@ -66,7 +68,7 @@ De logische framebuffer is 640 × 180 en wordt in software naar het fysieke 180 
 De firmwareversie staat in `firmware/src/panel_version.h`; scherm, handshake en image-marker gebruiken diezelfde bron. Generated assets staan in de repository. Alleen bij ontwerpwijzigingen opnieuw genereren:
 
 ```sh
-uv run scripts/generate_demo_assets.py
+uv run --locked python scripts/generate_demo_assets.py
 ```
 
 ## USB-installatie en herstel
