@@ -77,3 +77,17 @@ Bij disconnect gooit de host sessie, decoderbuffer en outstanding requests weg. 
 ## Verificatie
 
 `tests/test_service.py` compileert de echte `ProductionSession`-handler met de gepinde ArduinoJson-library en verbindt die via pseudoterminals met de Python-service. De suite dekt identiteit/versies/health, revisies, statusfreshness, onbekende acties, framingisolatie en re-enumeratie. De firmwarebuild controleert de wiring voor USB en wifi. Dit is geen fysieke USB-, radio-, stroom- of NetLink-acceptatie.
+
+## Read-only apparaatstatus vanaf 0.7.0
+
+De nieuwe capability `device.state.v1` accepteert een hostrequest `device.state` met dezelfde sessie/id, oplopende `revision`, `valid_for_ms` (1–3000), `desk` en `monitor`. Beide apparaatvelden zijn expliciet object of `null`. Zonder capability verstuurt de host dit bericht niet. Alle `action.request` blijven afgewezen; er wordt geen bureau-/monitoractie uitgevoerd.
+
+`desk` bevat integer `height_mm` (0–3000) en boolean `fresh`. Dit is een waarneming: de commandogrenzen 620–1270 mm worden niet op werkelijke metingen geklemd. `monitor` bevat de gekozen numerieke `bus` (maximaal 8 tekens), `brightness` (0–100 of null), `power` (`on`/`off`/`standby` of null), `source` (maximaal 24 zichtbare ASCII-tekens of null) en boolean `fresh`. Ontbrekende metingen worden niet vervangen door defaults. Een vaste HDMI-bron van een Waveshare is geldige read-only status, ook zonder source-switchcapability.
+
+De firmware valideert de volledige snapshot vóór toepassing. Een ongeldige, dubbele of oudere revisie vervangt niets en vernieuwt de datalease niet. Antwoord is `device.state.ack` met dezelfde sessie/id en toegepaste revisie. Na verlopen lease, sessieverlies of nieuwe handshake worden alle apparaatwaarden onbekend. Een heartbeat alleen vernieuwt de datalease niet. Nieuwe waarden maken geen slapend scherm wakker.
+
+Het display toont gemeten hoogte en helderheid/power/ingang; `fresh:false` krijgt de tekst LAATST BEKEND. Onbekende waarden verschijnen als `--`/Onbekend. Bureau-/monitorbediening, presets en fysieke demo-reset/scenariogebaren zijn in deze modus geblokkeerd; lokale paneelinstellingen en navigatie blijven beschikbaar. Een expliciete bench-scene kan de standalone demo opnieuw openen nadat de productie-eigenaar is gestopt. Geen automatische terugval naar demowaarden bij verlies van de host.
+
+`state.snapshot.state.mode` blijft vóór de eerste `device.state` voor oude hosts `standalone_demo`; daarna is het `read_only`, ook na leaseverloop. De bijgewerkte hostcore accepteert beide modes. Nieuwe host plus oude firmware behoudt statusbewaking maar verstuurt geen apparaatstatus. Installeer host en firmware daarom als gekoppelde, capability-gecontroleerde wijzigingen.
+
+De webserver blijft eigenaar van MQTT-status. De upstream hostmodule krijgt alleen generieke requestvelden en modecompatibiliteit; de webserver gebruikt daarvoor de bestaande SerialX-adapter, zonder pySerial terug toe te voegen. Firmware 0.7.0 wordt in deze wijziging gebouwd en native getest, niet automatisch op het fysieke paneel geïnstalleerd.

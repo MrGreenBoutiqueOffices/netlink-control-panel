@@ -144,6 +144,38 @@ void PanelDemo::draw(uint16_t *p) const {
   if(screen==Obstructed && height!=924 && !dimmed) {
     rect(p,20,108,425,25,Bg);formatHeight(h,height);snprintf(value,sizeof(value),"Bureau gestopt op %s cm. Haal het obstakel weg.",h);text(p,24,125,value,1,Muted);
   }
+  if(readOnly) {
+    const PanelDeviceState &d=deviceState;
+    uint16_t heightColor=d.heightFresh?Ink:Muted;
+    if(dimmed || screen==Sleep) {
+      rect(p,190,50,260,80,Bg);
+      if(d.heightKnown) {formatHeight(h,d.heightMm);int x=(640-width(h,9)-width("cm",1)-4)/2;text(p,x,108,h,9,Disabled);text(p,x+width(h,9)+4,108,"cm",1,Disabled);}
+      else text(p,300,108,"--",9,Disabled);
+    } else if(screen==Desk || screen==Offline) {
+      region(p,Offline,8,8,132,164,8,8);region(p,Offline,500,8,132,164,500,8);
+      rect(p,148,7,344,83,Bg);text(p,154,21,d.heightKnown?(d.heightFresh?"BUREAUHOOGTE":"LAATST BEKEND"):"HOOGTE ONBEKEND",0,Muted);
+      if(d.heightKnown)number(p,154,79,d.heightMm,7,heightColor,Muted);else text(p,154,79,"--",7,Muted);
+      rect(p,148,90,228,82,Card);text(p,166,122,"NETLINK",0,Muted);text(p,166,153,"Alleen-lezen",3,Ink);
+    } else if(screen==Menu) {
+      rect(p,154,48,200,26,Card);
+      if(d.monitorKnown) {snprintf(value,sizeof(value),"Monitor %s - %s",d.monitorBus,d.monitorFresh?"actueel":"laatst bekend");text(p,158,64,value,1,Muted);}
+      else text(p,158,64,"Status onbekend",1,Muted);
+      rect(p,420,48,204,27,Card);text(p,426,64,"Nog niet beschikbaar",1,Muted);
+    } else if(screen==Monitor) {
+      rect(p,334,19,132,58,Bg);
+      if(d.monitorKnown && d.monitorBrightness>=0)snprintf(value,sizeof(value),"%d",d.monitorBrightness);else strcpy(value,"--");
+      int x=458-width(value,6)-width("%",4);text(p,x,68,value,6,d.monitorFresh?Ink:Muted);text(p,x+width(value,6),68,"%",4,Muted);
+      rect(p,118,65,205,21,Bg);text(p,118,79,d.monitorFresh?"ALLEEN-LEZEN":"LAATST BEKEND / ONBEKEND",0,Muted);
+      rect(p,104,94,68,78,Card);rect(p,396,94,68,78,Card);text(p,130,140,"-",4,Disabled);text(p,422,140,"+",4,Disabled);
+      rect(p,174,98,220,65,Bg);rect(p,180,130,208,6,Selected);
+      if(d.monitorKnown && d.monitorBrightness>=0){int pos=180+208*d.monitorBrightness/100;rect(p,180,130,pos-180,6,Muted);rect(p,pos-4,113,8,40,Muted);}
+      rect(p,480,40,145,40,Card);const char *power=!strcmp(d.monitorPower,"on")?"Aan":!strcmp(d.monitorPower,"off")?"Uit":!strcmp(d.monitorPower,"standby")?"Stand-by":"Onbekend";text(p,486,68,power,4,Ink);
+      rect(p,480,126,145,39,Card);
+      const char *source=d.monitorSource[0]?d.monitorSource:"Onbekend";
+      if(!strcmp(source,"DISPLAYPORT1"))source="DisplayPort";else if(!strcmp(source,"USBC"))source="USB-C";
+      text(p,486,152,source,2,Ink);
+    }
+  }
   int intensity=brightness;
   if(intensity<100) for(int i=0;i<640*180;++i) {
     uint16_t c=p[i];p[i]=((((c>>11)&31)*intensity/100)<<11)|((((c>>5)&63)*intensity/100)<<5)|((c&31)*intensity/100);
@@ -159,6 +191,14 @@ void PanelDemo::move(int value,int kind) {
   if(height==value) { screen=Desk;dirty=true;return; }
   target=value;motionKind=kind;screen=Moving;lastTick=0;savedPreset=0;dirty=true;
 }
+void PanelDemo::setDeviceState(const PanelDeviceState &value) {
+  bool changed=!readOnly || deviceState.heightKnown!=value.heightKnown || deviceState.heightFresh!=value.heightFresh ||
+    deviceState.heightMm!=value.heightMm || deviceState.monitorKnown!=value.monitorKnown || deviceState.monitorFresh!=value.monitorFresh ||
+    deviceState.monitorBrightness!=value.monitorBrightness || strcmp(deviceState.monitorBus,value.monitorBus) || strcmp(deviceState.monitorPower,value.monitorPower) || strcmp(deviceState.monitorSource,value.monitorSource);
+  readOnly=true;deviceState=value;height=value.heightMm;connected=value.heightKnown;
+  if(screen==Confirm || screen==Moving || screen==Presets || screen==Calibrate)screen=Desk;
+  manualHold=false;calibrating=false;target=height;if(changed)dirty=true;
+}
 void PanelDemo::setHeight(int value) { height=clampHeight(value);dirty=true; }
 void PanelDemo::setBusy(bool value) {
   if(value && !busy) { if(screen==Moving)screen=Desk;manualHold=false;calibrating=false;consumed=true;dirty=true; }
@@ -171,7 +211,7 @@ void PanelDemo::touchDown(int x,int y,uint32_t now) {
   if(dimmed || screen==Sleep) { dimmed=false;if(screen==Sleep)screen=Desk;consumed=true;dirty=true; }
   else if(screen==Calibrate && x>=464 && x<632 && y>=8 && y<172) { calibrating=true;consumed=true;lastTick=now;dirty=true; }
   else if(screen==Moving) { screen=Desk;manualHold=false;consumed=true;lastTick=0;dirty=true; }
-  else if((screen==Desk || screen==Confirm) && connected && y>=8 && y<172 && ((x>=8 && x<140) || (x>=500 && x<632))) {
+  else if((screen==Desk || screen==Confirm) && connected && !readOnly && y>=8 && y<172 && ((x>=8 && x<140) || (x>=500 && x<632))) {
     if(screen==Desk)target=height;
     motionKind=x<140?4:3;target+=x<140?-10:10;
     target=clampHeight(target);
@@ -187,7 +227,7 @@ void PanelDemo::touchMove(int x,int y,uint32_t now) {
     manualHold=false;consumed=true;lastTick=0;dirty=true;return;
   }
   if(!finger || busy || (screen!=Monitor && screen!=Settings && screen!=SettingsRotated) || downX<180 || downX>=388 || downY<98 || downY>=163) return;
-  if(screen==Monitor && !connected)return;
+  if(screen==Monitor && (!connected || readOnly))return;
   if(x<180)x=180;if(x>388)x=388;
   int value=(x-180)*100/208;if((screen==Settings || screen==SettingsRotated) && value<10)value=10;
   int &setting=(screen==Settings || screen==SettingsRotated)?brightness:monitor;
@@ -211,25 +251,25 @@ void PanelDemo::tap(int x,int y,uint32_t held) {
   }
   if(screen==Desk || screen==Offline || screen==Confirm) {
     if(screen!=Confirm && x>=384 && x<492 && y>=94 && y<172) {
-      if(held>=1000) { connected=!connected;screen=connected?Desk:Offline; } else screen=Menu;
+      if(held>=1000 && !readOnly) { connected=!connected;screen=connected?Desk:Offline; } else screen=Menu;
       return;
     }
-    if(!connected) return;
+    if(!connected || readOnly) return;
     if(y>=94 && y<172) {
       if(screen==Confirm) { if(x>=148 && x<256)screen=Desk;else if(x>=264 && x<492)move(target,motionKind==1 || motionKind==2?motionKind:0); }
       else if(x>=148 && x<258) { sit=clampHeight(sit);target=sit;motionKind=1;screen=Confirm; }
       else if(x>=266 && x<376) { stand=clampHeight(stand);target=stand;motionKind=2;screen=Confirm; }
     }
   } else if(x>=8 && x<96 && y>=8 && y<172) {
-    if(held>=1500) { *this=PanelDemo();lastTouch=0; }
+    if(held>=1500 && !readOnly) { *this=PanelDemo();lastTouch=0; }
     else { screen=(screen==Menu || screen==Monitor)?(connected?Desk:Offline):Menu;savedPreset=0; }
   } else if(screen==Menu) {
     if(x>=104 && x<364 && y>=8 && y<86)screen=Monitor;
-    else if(x>=372 && x<632 && y>=8 && y<86)screen=Presets;
+    else if(x>=372 && x<632 && y>=8 && y<86){ if(!readOnly)screen=Presets; }
     else if(x>=104 && x<364 && y>=94 && y<172)screen=rotated?SettingsRotated:Settings;
-    else if(x>=372 && x<632 && y>=94 && y<172 && held>=1000)scene(Boot,downAt+held);
+    else if(x>=372 && x<632 && y>=94 && y<172 && held>=1000 && !readOnly)scene(Boot,downAt+held);
   } else if(screen==Monitor || screen==Settings || screen==SettingsRotated) {
-    bool settings=screen==Settings || screen==SettingsRotated;if(!settings && !connected)return;
+    bool settings=screen==Settings || screen==SettingsRotated;if(!settings && (!connected || readOnly))return;
     int &value=settings?brightness:monitor;
     if(y>=94 && y<172 && x>=104 && x<172) { value-=5;if(value<(settings?10:0))value=settings?10:0; }
     else if(y>=94 && y<172 && x>=396 && x<464) { value+=5;if(value>100)value=100; }

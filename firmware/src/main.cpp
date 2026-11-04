@@ -60,6 +60,7 @@ void releaseSession(bool preserveTransfer = false) {
   if (!preserveTransfer) ota.abort();
   linked = false;
   production.clear();
+  if(demo.readOnly)demo.setDeviceState(PanelDeviceState{});
   active = Transport::None;
   wifiClient.stop();
   wifiInbox = Inbox{};
@@ -157,7 +158,7 @@ void receive(Transport source, const char *line) {
     StaticJsonDocument<384> boot;ota.describe(boot.to<JsonObject>());
     bool accepted = production.handle(message,response,millis(),panelId,PANEL_FIRMWARE_VERSION,bootId,startupHealthy(),boot["state"] | "unknown");
     if (response["id"].is<int>()) sendTo(source,response);
-    if (accepted) { active=source;linked=true;lastHost=millis(); }
+    if (accepted) { active=source;linked=true;lastHost=millis();demo.setDeviceState(production.devices); }
     return;
   }
   if (!message["v"].is<int>() || message["v"].as<int>() != 1 || !message["type"].is<const char *>()) return;
@@ -311,6 +312,7 @@ void setup() {
 
 void loop() {
   ota.tick();
+  if(production.expire(millis()))demo.setDeviceState(production.devices);
   // USB always has priority and can recover/reconfigure a bad Wi-Fi setup.
   readStream(Serial, usbInbox, Transport::USB);
   if (applyWifiPending) applyWifi();

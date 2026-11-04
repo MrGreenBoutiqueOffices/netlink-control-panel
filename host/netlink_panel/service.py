@@ -129,10 +129,14 @@ class Session:
         if self.device.write(frame) != len(frame):
             raise ServiceError("short_usb_write")
 
-    def request(self, kind, *, timeout=TIMEOUT, handshake=False):
+    def request(self, kind, *, timeout=TIMEOUT, handshake=False, fields=None):
         self.sequence += 1
         request_id = self.sequence
-        fields = {"protocol_min": VERSION, "protocol_max": VERSION} if handshake else {}
+        fields = dict(fields or {})
+        if set(fields) & {"v", "type", "id", "session"}:
+            raise ServiceError("reserved_request_field")
+        if handshake:
+            fields.update(protocol_min=VERSION, protocol_max=VERSION)
         started = self.clock()
         self.request_started = started
         self.send(kind, id=request_id, **fields)
@@ -219,7 +223,7 @@ class Session:
         if (
             not isinstance(state, dict)
             or state.get("self_test_ok") is not True
-            or state.get("mode") != "standalone_demo"
+            or state.get("mode") not in {"standalone_demo", "read_only"}
         ):
             raise ServiceError("invalid_panel_state")
         if state.get("desk", False) is not None or state.get("monitor", False) is not None:
@@ -233,7 +237,7 @@ class Session:
             "revision": self.revision,
             "sampled_uptime_ms": message["sampled_uptime_ms"],
             "valid_for_ms": remaining,
-            "state": {"self_test_ok": True, "mode": "standalone_demo", "desk": None, "monitor": None},
+            "state": {"self_test_ok": True, "mode": state["mode"], "desk": None, "monitor": None},
         }
 
 

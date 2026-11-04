@@ -88,6 +88,18 @@ int main(int argc,char **argv) {
   assert(d.scene(13,100));tap(d,550,130,300);assert(d.screen==PanelDemo::Desk);
   assert(d.scene(14,100));assert(d.height==924);tap(d,550,80,300);assert(d.screen==PanelDemo::Desk);
   assert(!d.scene(-1,100) && !d.scene(17,100));
+  // Production readings are never substituted by a target or a demo preset.
+  d=PanelDemo();PanelDeviceState live;live.heightKnown=true;live.heightFresh=true;live.heightMm=1086;
+  live.monitorKnown=true;live.monitorFresh=false;live.monitorBrightness=83;
+  snprintf(live.monitorBus,sizeof(live.monitorBus),"20");snprintf(live.monitorPower,sizeof(live.monitorPower),"off");snprintf(live.monitorSource,sizeof(live.monitorSource),"USBC");
+  d.setDeviceState(live);assert(d.readOnly && d.height==1086);
+  tap(d,560,80,100);d.tick(1000);assert(d.height==1086 && d.screen==PanelDemo::Desk);
+  tap(d,200,130,1100);assert(d.screen==PanelDemo::Desk);
+  tap(d,420,130,1200);assert(d.screen==PanelDemo::Menu);tap(d,180,50,1400);assert(d.screen==PanelDemo::Monitor);
+  tap(d,430,130,1600);tap(d,550,50,1800);assert(d.deviceState.monitorBrightness==83 && std::string(d.deviceState.monitorPower)=="off");
+  d.draw(memory+1);assert(memory[0]==0x1234 && memory[640*180+1]==0x5678);
+  d.setDeviceState(PanelDeviceState{});assert(d.readOnly && !d.deviceState.heightKnown && d.height==0);
+  d.draw(memory+1);assert(memory[0]==0x1234 && memory[640*180+1]==0x5678);
   delete[] memory;
 }
 """

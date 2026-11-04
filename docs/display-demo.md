@@ -67,3 +67,9 @@ Bewijs staat lokaal in `artifacts/display-0.4.3/verification.json` en de USB-ins
 
 
 De atomische framebuffer-API vanaf 0.5.0 maakt bij offset nul één kopie in PSRAM en geeft iedere chunk dezelfde `snapshot_id` en `snapshot_screen`. Gelijktijdige bediening of automatisch dimmen kan die opname niet meer vermengen. De browserkopie houdt voorlopig de vorige ontwerpset; deze 17-schermenuitwerking is de native displaydemo.
+
+## Alleen-lezen status in 0.7.0
+
+Een nieuwe webserver-adapter kan werkelijke bureau- en monitorstatus sturen met capability `device.state.v1`; zie `production-protocol.md`. Er is geen Dell-afhankelijkheid: alleen een Waveshare, of een bureau zonder monitor, wordt ondersteund. De host bepaalt één geselecteerde monitor; onbekende of oude waarden worden expliciet aangegeven. In deze modus veranderen tikken/hold/release geen hoogte en starten ze geen simulatie. Bedieningscommando’s volgen later.
+
+Native C++-tests dekken atomische validatie, data-expiry, onbekende status en geblokkeerde touch. De native schermen zijn visueel gecontroleerd; dit is geen hardware-/NetLink-acceptatie. Laatst fysiek gecontroleerde firmware blijft 0.6.0; 0.7.0 is nog niet geïnstalleerd.
