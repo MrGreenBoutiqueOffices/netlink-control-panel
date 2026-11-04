@@ -2,7 +2,7 @@
 
 De service in deze repository vervangt voor discovery, enrollment en statusbewaking het Mac-benchprogramma. Hij draait op Linux zonder wifi of internet en bewaakt één expliciet gekoppeld paneel. Hij publiceert alleen lokale geschoonde status; MQTT-actuatie, agentintegratie, firmwaretransfer en een HTTP-beheerinterface zijn nog niet aanwezig.
 
-Voorwaarde is firmware 0.6.0 met [protocol v2](production-protocol.md). Een paneel met de eerder geïnstalleerde 0.5.2 krijgt geen geslaagde productiehandshake. Deze PR bouwt nieuwe firmware maar installeert die niet automatisch. De bestaande v1-tools blijven bruikbaar wanneer er geen actieve v2-sessie is.
+Voorwaarde is firmware 0.6.0 met [protocol v2](production-protocol.md). Een paneel met de eerder geïnstalleerde 0.5.2 krijgt geen geslaagde productiehandshake. De firmware is inmiddels afzonderlijk via USB op het prototype geïnstalleerd en met de service getest; de procedure hieronder installeert niets automatisch. De bestaande v1-tools blijven bruikbaar wanneer er geen actieve v2-sessie is.
 
 ## Lokaal starten
 
@@ -75,3 +75,15 @@ uv tool run --from platformio==6.1.18 pio run --project-dir firmware
 ```
 
 De firmwarebuild moet eerst één keer gedaan zijn om de gepinde ArduinoJson-headers voor de native protocoltests beschikbaar te maken. Tests gebruiken eigen pseudoterminals en schrijven niet naar het echte paneel.
+
+## Fysieke USB-proef op de Mac — 4 november 2026
+
+Firmware 0.6.0 uit broncommit `684205f` is na controle van USB-identiteit, fabrieksbackup en actieve slot app-only via USB geschreven. Esptool verifieerde de flashhash. Daarna bevestigde de v1-hello de verwachte imagehash, versie 0.6.0, VALID en geslaagde startup-self-check.
+
+Op hetzelfde fysieke paneel slaagden de v2-handshake, boardprofiel-/identiteitscontrole, snapshots met revisies 1/2/3 en het afwijzen van niet-ondersteunde acties. De gerapporteerde boardrevisie blijft bewust `unverified`; bureau en monitor bleven onbekend. Er zijn geen UI-acties geïnjecteerd of echte apparaatcommando’s verstuurd.
+
+De eerste directe overgang na een v1-hello leverde terecht `busy`: een open USB-client sluiten beëindigt de applicatiesessie niet meteen. Na de 3,5-seconden-livenessgrens slaagde v2. Wacht bij handmatige enrollment na het stoppen van een benchclient minimaal vier seconden; de daemon probeert bij busy zelf opnieuw met backoff. Dit vereist geen firmwarewijziging.
+
+De echte CLI-enrollment slaagde, schreef mode 0600 en weigerde overschrijven. Een serviceproef van 15 seconden leverde 14 verschillende actuele revisies; na nette stop en herstart volgden opnieuw revisie 1 en vijf actuele revisies in vijf seconden. Een tweede gelijktijdige service werd in beide proeven geweigerd. SIGTERM sloot de service en publiceerde `stopped`. Na een afzonderlijke geforceerde hostprocesstop (SIGKILL) werd de oude snapshot na vier seconden als stale zonder bruikbare status gelezen. Een nieuwe service begon opnieuw bij revisie 1 en is na de controle netjes gestopt.
+
+Dit bewijst USB-communicatie met het display vanaf macOS. Het is geen fysieke kabel-hotplug, stroomuitval-, duur- of doel-NetLink-permissietest. Het lokale bewijs staat onder `artifacts/display-0.6.0/verification.json` (bewust buiten Git); de bijbehorende image en manifest staan onder `artifacts/releases/`.
