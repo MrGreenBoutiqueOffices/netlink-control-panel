@@ -12,7 +12,9 @@ Onderdeel van #23. Firmware/protocol blijven in `netlink-control-panel`; de best
 4. Alle Python- en native C++-tests. Een ontbrekende compiler, ArduinoJson-headers of TLS-PSK-capability mag niet in een groene CI met overgeslagen tests eindigen.
 5. Packaging en contractcontrole van de firmware en het protocolpakket, gevolgd door een commitgebonden GitHub Actions-artifact `panel-<commit>` (30 dagen beschikbaar).
 
-GitHub Actions zijn op commit-SHA gepind; uv, Python en Node hebben vaste versies. De runner is Ubuntu 24.04. De bestaande lokale systeemtests blijven bruikbaar op een machine zonder alle CI-voorwaarden, maar `scripts/check_tests.py` accepteert geen skips.
+GitHub Actions zijn op commit-SHA gepind; uv, Python en Node hebben vaste versies. De runner is Ubuntu 24.04. De generator legt de BASIC-lettertypelayout expliciet vast op macOS en Linux. PNG-referenties worden op identieke afmetingen en RGBA-pixels gecontroleerd, zodat verschillen in lossless PNG-compressie/metadata geen valse drift geven; de embedded C++-arrays moeten byte voor byte gelijk blijven.
+
+De bestaande lokale systeemtests blijven bruikbaar op een machine zonder alle CI-voorwaarden, maar `scripts/check_tests.py` accepteert geen skips.
 
 Lokaal hetzelfde controlepad:
 

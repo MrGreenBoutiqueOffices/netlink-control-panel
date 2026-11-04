@@ -67,7 +67,7 @@ def generate(output):
         (26, 400),
     ]
     for i, (size, weight) in enumerate(fonts):
-        font = ImageFont.truetype(root / "preview/assets/inter.ttf", size)
+        font = ImageFont.truetype(root / "preview/assets/inter.ttf", size, layout_engine=ImageFont.Layout.BASIC)
         font.set_variation_by_axes([14, weight])
         alphas = []
         glyphs = []
@@ -99,6 +99,17 @@ def generate(output):
     print("RLE frame bytes", sum(wordcounts) * 2, "source size", sum(len(line) for line in out))
 
 
+def same_asset(generated, committed):
+    if not committed.exists():
+        return False
+    if generated.suffix == ".png":
+        # PNG compression/metadata differ between zlib builds. Compare exactly
+        # the RGBA pixels consumed by visual QA, not platform-specific encoding.
+        with Image.open(generated) as left, Image.open(committed) as right:
+            return left.size == right.size and left.convert("RGBA").tobytes() == right.convert("RGBA").tobytes()
+    return generated.read_bytes() == committed.read_bytes()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Compare regenerated files without modifying the checkout")
@@ -112,11 +123,7 @@ def main():
         changed = [
             str(path.relative_to(generated))
             for path in generated.rglob("*")
-            if path.is_file()
-            and (
-                not (root / path.relative_to(generated)).exists()
-                or path.read_bytes() != (root / path.relative_to(generated)).read_bytes()
-            )
+            if path.is_file() and not same_asset(path, root / path.relative_to(generated))
         ]
         if changed:
             raise SystemExit("Generated assets differ: " + ", ".join(sorted(changed)))
