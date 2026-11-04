@@ -11,9 +11,11 @@ from netlink_panel.ota import (
     SLOT_SIZE,
     OTAError,
     Peer,
+    RecoveryBudget,
     check_hello,
     confirm,
     inspect_image,
+    peer_diagnostics,
     upload,
 )
 from netlink_panel.protocol import Decoder, encode
@@ -270,3 +272,50 @@ class ResumeOffsetTests(unittest.TestCase):
         upload(Peer(panel), data, inspect_image(data), allow_resume=True)
         self.assertEqual(panel.payload, b"")
         self.assertFalse(panel.activated)
+
+
+class RecoveryBudgetTests(unittest.TestCase):
+    def test_only_new_confirmed_bytes_reset_the_stalled_retry_budget(self):
+        budget = RecoveryBudget()
+        for _ in range(5):
+            budget.retry()
+        budget.advance(0)
+        with self.assertRaisesRegex(OTAError, "without forward progress"):
+            budget.retry()
+        budget.advance(512)
+        self.assertEqual(budget.failures_without_progress, 0)
+        for _ in range(5):
+            budget.retry()
+        budget.advance(512)
+        budget.advance(0)
+        with self.assertRaises(OTAError):
+            budget.retry()
+        budget.advance(1024)
+        budget.retry()
+        self.assertEqual((budget.recoveries, budget.failures_without_progress, budget.confirmed_offset), (11, 1, 1024))
+
+    def test_peer_diagnostics_are_bounded_and_never_include_credentials(self):
+        result = peer_diagnostics(
+            {
+                "firmware": "0.8.0",
+                "uptime_ms": 123,
+                "reset_reason": 3,
+                "wifi": {"rssi": -85, "last_disconnect_reason": 201, "ssid": "secret", "key": "secret"},
+                "password": "secret",
+            }
+        )
+        self.assertEqual(
+            result,
+            {"firmware": "0.8.0", "uptime_ms": 123, "reset_reason": 3, "rssi_dbm": -85, "wifi_disconnect_reason": 201},
+        )
+        self.assertEqual(
+            peer_diagnostics(
+                {
+                    "firmware": "secret\n" * 32,
+                    "uptime_ms": True,
+                    "reset_reason": -1,
+                    "wifi": {"rssi": -999, "last_disconnect_reason": "secret"},
+                }
+            ),
+            {},
+        )

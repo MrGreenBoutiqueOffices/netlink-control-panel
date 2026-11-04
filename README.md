@@ -94,7 +94,7 @@ uv run panel wifi serve --duration 300 --height 740 --brightness 60
 
 Netwerknaam en wachtwoord worden interactief gevraagd. De firmware bewaart configuratie in NVS; credentials komen niet in de firmwarebron. De bench gebruikt een eigen TLS-PSK-sleutel. NVS/flash is nog niet versleuteld. Zie [wifi-procedure en beperkingen](docs/wifi.md).
 
-De bestaande `uv run panel wifi update` schrijft naar het inactieve applicatieslot en controleert na reboot de image en bootbevestiging. Hervatten na verbindingsverlies en rollback zijn fysiek aangetoond bij eerdere firmware. De grotere 0.4.1-overdracht bereikte echter het reconnectbudget rond 95%; dat eerdere bewijs is dus geen algemene OTA-acceptatie. Gebruik voorlopig USB voor installatie van de huidige demoimage. Zie [OTA-procedure](docs/ota.md) en de [actuele displayteststatus](docs/display-demo.md).
+De bestaande `uv run panel wifi update` schrijft naar het inactieve applicatieslot en controleert na reboot de image en bootbevestiging. Hervatten na verbindingsverlies en rollback zijn fysiek aangetoond bij eerdere firmware. De grotere 0.4.1-overdracht bereikte echter het reconnectbudget rond 95%. De [full-image-hostfix](docs/ota-full-image.md) herstelt nu op basis van bevestigde voortgang en heeft TLS-foutinjectietests; fysieke acceptatie van de grotere image blijft open. Gebruik voorlopig USB voor installatie van de huidige demoimage. Zie [OTA-procedure](docs/ota.md) en de [actuele displayteststatus](docs/display-demo.md).
 
 Onafhankelijke releasehandtekeningen, secure boot, herstel bij alle stroom-/netwerkfouten en onbeheerde recovery zijn nog niet geaccepteerd. Wifi naar een echte NetLink, transportwissel en beheer zonder Mac zijn vervolgwerk.
 

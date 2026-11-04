@@ -31,6 +31,51 @@ class HandshakeRejected(OTAError):
     pass
 
 
+class RecoveryBudget:
+    """Bound stalled retries; verified forward progress starts a new budget."""
+
+    limit = 5
+
+    def __init__(self):
+        self.recoveries = 0
+        self.failures_without_progress = 0
+        self.confirmed_offset = 0
+        self.current_offset = 0
+
+    def advance(self, offset):
+        self.current_offset = offset
+        if offset > self.confirmed_offset:
+            self.confirmed_offset = offset
+            self.failures_without_progress = 0
+
+    def retry(self):
+        if self.failures_without_progress >= self.limit:
+            raise OTAError("OTA reconnect budget exhausted without forward progress")
+        self.failures_without_progress += 1
+        self.recoveries += 1
+
+
+def peer_diagnostics(hello):
+    """Only bounded numeric/identifier fields; never copy credentials or frames."""
+    result = {}
+    version = hello.get("firmware")
+    if isinstance(version, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,31}", version):
+        result["firmware"] = version
+    for field in ("uptime_ms", "reset_reason"):
+        value = hello.get(field)
+        if type(value) is int and 0 <= value <= 0xFFFFFFFF:
+            result[field] = value
+    wifi = hello.get("wifi")
+    if isinstance(wifi, dict):
+        value = wifi.get("rssi")
+        if type(value) is int and -127 <= value <= 0:
+            result["rssi_dbm"] = value
+        value = wifi.get("last_disconnect_reason")
+        if type(value) is int and 0 <= value <= 65535:
+            result["wifi_disconnect_reason"] = value
+    return result
+
+
 def inspect_image(data):
     """Accept only an exact ESP32-S3 app image with our retained board marker."""
     if not 288 <= len(data) <= SLOT_SIZE or data[0] != 0xE9 or not 1 <= data[1] <= 16:
@@ -126,13 +171,15 @@ def check_hello(hello, pairing, manifest):
     return ota
 
 
-def upload(peer, data, manifest, *, allow_resume=False):
+def upload(peer, data, manifest, *, allow_resume=False, progress=None):
     response = peer.request("ota_begin", **manifest)
     start = response.get("next_offset")
     if type(start) is not int or start < 0 or start > len(data) or (start != len(data) and start % CHUNK_SIZE):
         raise OTAError("Panel returned an invalid resume offset")
     if start and not allow_resume:
         raise OTAError("Panel did not begin at offset zero")
+    if progress is not None:
+        progress(start)
     if start:
         report("ota_resumed", offset=start, size=len(data))
     last_percent = -1
@@ -141,6 +188,8 @@ def upload(peer, data, manifest, *, allow_resume=False):
         response = peer.request("ota_chunk", offset=offset, data=base64.b64encode(chunk).decode("ascii"))
         if response.get("next_offset") != offset + len(chunk):
             raise OTAError("Panel acknowledged an unexpected offset; transfer stopped")
+        if progress is not None:
+            progress(offset + len(chunk))
         percent = (offset + len(chunk)) * 100 // len(data)
         if percent // 10 != last_percent // 10:
             report("ota_progress", percent=percent)
@@ -196,10 +245,48 @@ def update(args):
         "status": "started",
     }
     write_receipt(args.receipt, receipt)
-    deadline = time.monotonic() + args.timeout
+    started = time.monotonic()
+    deadline = started + args.timeout
     awaiting_reboot = False
     recovering_transfer = False
-    recovery_count = 0
+    budget = RecoveryBudget()
+    sessions = deque(maxlen=32)
+    session_count = 0
+    tls_rejections = 0
+    phase = "listen"
+
+    def checkpoint(status=None):
+        elapsed = time.monotonic() - started
+        receipt.update(
+            phase=phase,
+            elapsed_ms=round(elapsed * 1000),
+            confirmed_bytes=budget.confirmed_offset,
+            current_bytes=budget.current_offset,
+            tls_rejections=tls_rejections,
+            average_bytes_per_second=round(budget.confirmed_offset / max(elapsed, 0.001), 1),
+            recoveries=budget.recoveries,
+            failures_without_progress=budget.failures_without_progress,
+            sessions=list(sessions),
+            sessions_omitted=max(0, session_count - len(sessions)),
+        )
+        if status is not None:
+            receipt["status"] = status
+        write_receipt(args.receipt, receipt)
+
+    def retry(error):
+        receipt["last_transport_error"] = {"phase": phase, "reason": type(error).__name__}
+        budget.retry()
+        checkpoint("reconnecting")
+        report(
+            "ota_reconnecting",
+            recovery=budget.recoveries,
+            failures_without_progress=budget.failures_without_progress,
+            confirmed_bytes=budget.confirmed_offset,
+            phase=phase,
+            reason=type(error).__name__,
+            elapsed_ms=receipt["elapsed_ms"],
+        )
+
     context = psk_context(pairing["panel_id"], pairing["key"], server=True)
     try:
         with socket.socket() as listener:
@@ -209,42 +296,60 @@ def update(args):
             listener.settimeout(0.5)
             report("ota_waiting", panel_id=pairing["panel_id"], version=manifest["version"])
             while time.monotonic() < deadline:
+                phase = "listen"
                 try:
                     raw, _ = listener.accept()
                 except TimeoutError:
                     continue
+                phase = "tls"
                 # Bad TLS clients cannot receive image bytes or stop the server.
                 try:
-                    raw.settimeout(3)
+                    raw.settimeout(min(3, max(0.01, deadline - time.monotonic())))
                     raw.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                    tls_started = time.monotonic()
                     connection = context.wrap_socket(raw, server_side=True)
-                except OSError:
+                    tls_ms = round((time.monotonic() - tls_started) * 1000)
+                except OSError as error:
                     raw.close()
-                    report("ota_client_rejected")
+                    tls_rejections += 1
+                    if tls_rejections <= 5:
+                        report("ota_client_rejected", phase="tls", reason=type(error).__name__)
                     continue
                 with connection:
                     peer = Peer(TLSStream(connection), deadline=deadline)
+                    phase = "hello"
+                    hello_started = time.monotonic()
                     try:
                         hello = peer.request("hello")
-                    except (OSError, HandshakeRejected):
+                    except (OSError, HandshakeRejected) as error:
                         if awaiting_reboot or recovering_transfer:
-                            recovery_count += 1
-                            if recovery_count > 5:
-                                raise OTAError("OTA reconnect budget exhausted")
+                            retry(error)
                             continue
                         raise
                     ota = check_hello(hello, pairing, manifest)
+                    session_count += 1
+                    sample = {
+                        **peer_diagnostics(hello),
+                        "elapsed_ms": round((time.monotonic() - started) * 1000),
+                        "hello_ms": round((time.monotonic() - hello_started) * 1000),
+                        "tls_ms": tls_ms,
+                        "confirmed_bytes": budget.confirmed_offset,
+                    }
+                    sessions.append(sample)
+                    checkpoint()
+                    report("ota_session", **sample)
                     # A finish ACK may be lost before the device processes it.
                     # Only an explicitly retained transfer permits finishing on
                     # the old image; a different boot without it means failure.
                     retained_finish = awaiting_reboot and ota.get("receiving") is True
                     if (awaiting_reboot and not retained_finish) or ota.get("image_sha256") == manifest["image_sha256"]:
+                        phase = "confirm"
                         try:
                             result = confirm(peer, hello, pairing, manifest)
-                        except (OSError, TimeoutError):
-                            if recovery_count >= 5 or time.monotonic() >= deadline:
+                        except (OSError, TimeoutError) as error:
+                            if time.monotonic() >= deadline:
                                 raise
-                            recovery_count += 1
+                            retry(error)
                             recovering_transfer = True
                             continue
                         action = (
@@ -255,41 +360,42 @@ def update(args):
                             )
                         )
                         result.update(action=action, reboot_observed=awaiting_reboot)
-                        receipt.update(status="confirmed", confirmed=result, recoveries=recovery_count)
-                        write_receipt(args.receipt, receipt)
+                        receipt["confirmed"] = result
+                        phase = "complete"
+                        checkpoint("confirmed")
                         report("ota_confirmed", **result)
                         return 0
                     if ota.get("state") == "pending":
                         raise OTAError("Another image is awaiting boot confirmation; refusing to overwrite")
                     resumable = "ota_resume_v1" in hello["capabilities"]
+                    phase = "transfer"
                     try:
-                        upload(peer, data, manifest, allow_resume=resumable)
+                        upload(peer, data, manifest, allow_resume=resumable, progress=budget.advance)
                         recovering_transfer = False
-                    except (OSError, TimeoutError):
-                        if resumable and recovery_count < 5 and time.monotonic() < deadline:
-                            recovery_count += 1
+                    except (OSError, TimeoutError) as error:
+                        if resumable and time.monotonic() < deadline:
+                            retry(error)
                             recovering_transfer = True
-                            receipt.update(status="reconnecting", recoveries=recovery_count)
-                            write_receipt(args.receipt, receipt)
-                            report("ota_reconnecting", recovery=recovery_count)
                             continue
                         raise
                     awaiting_reboot = True
-                    receipt["status"] = "awaiting_reboot"
-                    write_receipt(args.receipt, receipt)
+                    phase = "activate"
+                    checkpoint("awaiting_reboot")
                     try:
                         response = peer.request("ota_finish")
                         if response.get("state") != "rebooting":
                             raise OTAError("Panel did not schedule a reboot")
-                    except (OSError, TimeoutError):
-                        # Activation may have succeeded. Only observed boot hash
-                        # and a confirmed app state can resolve this uncertainty.
-                        pass
+                    except (OSError, TimeoutError) as error:
+                        # Activation may have succeeded. Reconnect and verify,
+                        # but repeated lost finish requests must also be bounded.
+                        if time.monotonic() >= deadline:
+                            raise
+                        retry(error)
                     report("ota_awaiting_reboot")
             raise OTAError("Update timed out without observing the requested image and confirmed boot")
     except BaseException as error:
         receipt.update(status="unconfirmed" if awaiting_reboot else "failed", reason=type(error).__name__)
         if isinstance(error, OTAError):
             receipt["detail"] = str(error)
-        write_receipt(args.receipt, receipt)
+        checkpoint()
         raise
