@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "version": "1.0.0",
+  "selected_symbols": [
+    "Enrollment",
+    "ServiceError",
+    "Session",
+    "atomic_json",
+    "bounded_text",
+    "candidates",
+    "integer",
+    "ownership"
+  ],
+  "excluded_import_modules": [
+    "serial",
+    "serial.tools.list_ports"
+  ],
+  "consumer": {
+    "repository": "MrGreenBoutiqueOffices/netlink-webserver",
+    "commit": "86df1b055becfb5b290e9b1b123e4c9cad0cb005",
+    "generated_sha256": {
+      "protocol.py": "90c9b72ec8cc0c2fabca5eaea771b7664662b61d7df4e8357ec68ecc4bbc447d",
+      "transport.py": "d99d90e3aaacf6cf1e7f04275b7cb6e8955ef230713611dc94779973010d48f5"
+    }
+  }
+}
