@@ -83,10 +83,15 @@ void PanelDemo::draw(uint16_t *p) const {
     if(screen==Confirm) {
       rect(p,358,31,134,45,Bg);formatHeight(h,target);
       int x=486-width(h,5)-width("cm",2)-4;text(p,x,69,h,5,Gold);text(p,x+width(h,5)+4,69,"cm",2,Gold);
-      if(target<height) {
-        region(p,0,500,8,132,164,500,8);
-        rect(p,8,8,132,164,Gold);
-        region(p,1,536,72,61,35,44,72,true);
+      // The confirm artwork contains a highlighted up button. Use neutral
+      // buttons until an actual arrow gesture is held, independent of target.
+      region(p,Desk,8,8,132,164,8,8);
+      region(p,Desk,500,8,132,164,500,8);
+      if(finger && manualHold) {
+        if(motionKind==4) {
+          rect(p,8,8,132,164,Gold);
+          region(p,Confirm,536,72,61,35,44,72,true);
+        } else region(p,Confirm,500,8,132,164,500,8);
       }
     } else {
       for(int n=0;n<2;++n) {
@@ -243,7 +248,7 @@ void PanelDemo::touchUp(uint32_t now) {
 void PanelDemo::tap(int x,int y,uint32_t held) {
   dirty=true;
   if(screen>=Boot) {
-    if(held>=1000 && x<450) { scene(screen==Sleep?Desk:int(screen)+1,downAt+held);return; }
+    if(held>=1000 && x<450) { scene(screen==Sleep?Desk:int(screen)+1,downAt+held,true);return; }
     if(screen==UpdateFailed && x>=464 && x<632) { screen=y<86?Connecting:Desk;return; }
     if(screen==Obstructed && x>=464 && x<632) { screen=Desk;return; }
     if(screen==Updated) { screen=Desk;return; }
@@ -261,13 +266,13 @@ void PanelDemo::tap(int x,int y,uint32_t held) {
       else if(x>=266 && x<376) { stand=clampHeight(stand);target=stand;motionKind=2;screen=Confirm; }
     }
   } else if(x>=8 && x<96 && y>=8 && y<172) {
-    if(held>=1500 && !readOnly) { *this=PanelDemo();lastTouch=0; }
+    if(held>=1500 && !readOnly) { PanelSettings saved=settings();uint32_t now=downAt+held;*this=PanelDemo();applySettings(saved);lastTouch=now; }
     else { screen=(screen==Menu || screen==Monitor)?(connected?Desk:Offline):Menu;savedPreset=0; }
   } else if(screen==Menu) {
     if(x>=104 && x<364 && y>=8 && y<86)screen=Monitor;
     else if(x>=372 && x<632 && y>=8 && y<86){ if(!readOnly)screen=Presets; }
     else if(x>=104 && x<364 && y>=94 && y<172)screen=rotated?SettingsRotated:Settings;
-    else if(x>=372 && x<632 && y>=94 && y<172 && held>=1000 && !readOnly)scene(Boot,downAt+held);
+    else if(x>=372 && x<632 && y>=94 && y<172 && held>=1000 && !readOnly)scene(Boot,downAt+held,true);
   } else if(screen==Monitor || screen==Settings || screen==SettingsRotated) {
     bool settings=screen==Settings || screen==SettingsRotated;if(!settings && (!connected || readOnly))return;
     int &value=settings?brightness:monitor;
@@ -302,9 +307,9 @@ bool PanelDemo::tick(uint32_t now) {
   }
   bool result=dirty;dirty=false;return result;
 }
-bool PanelDemo::scene(int index,uint32_t now) {
+bool PanelDemo::scene(int index,uint32_t now,bool preserveSettings) {
   if(index<0 || index>16 || busy)return false;
-  *this=PanelDemo();screen=Screen(index);lastTouch=now;
+  PanelSettings saved=settings();*this=PanelDemo();if(preserveSettings)applySettings(saved);screen=Screen(index);lastTouch=now;
   if(screen==Moving) { height=942;target=1120;motionKind=2;freezeUntil=now+5000; }
   if(screen==Offline)connected=false;
   if(screen==Presets)height=1086;

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "device_state.h"
+#include "panel_settings.h"
 
 // Self-contained local simulation. It has no desk, monitor or network transport.
 class PanelDemo {
@@ -20,6 +21,8 @@ class PanelDemo {
   bool dirty = true, dimmed = false, busy = false;
   bool readOnly = false;
   PanelDeviceState deviceState;
+  PanelSettings settings() const { PanelSettings value;value.brightness=brightness;value.dimMinutes=dimMinutes;value.rotated=rotated;return value; }
+  void applySettings(const PanelSettings &value) { if(!value.valid())return;brightness=value.brightness;dimMinutes=value.dimMinutes;rotated=value.rotated;if(screen==Settings || screen==SettingsRotated)screen=rotated?SettingsRotated:Settings;dirty=true; }
   void setDeviceState(const PanelDeviceState &value);
   void draw(uint16_t *pixels) const;
   void drawStatus(uint16_t *pixels, Screen phase, int percent, bool checking = false) const;
@@ -28,7 +31,7 @@ class PanelDemo {
   void touchMove(int x, int y, uint32_t now);
   bool tick(uint32_t now);
   void setBusy(bool value);
-  bool scene(int index, uint32_t now);
+  bool scene(int index, uint32_t now, bool preserveSettings = false);
   void setHeight(int value);
   void freeze(uint32_t now) { freezeUntil = now + 5000; }
   const char *name() const;

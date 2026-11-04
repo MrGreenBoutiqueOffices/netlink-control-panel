@@ -10,7 +10,7 @@ Firmware **0.5.2 is via USB geïnstalleerd op het prototype**. De geschreven fla
 | --- | --- |
 | Native displaydemo | 17 aangeleverde ontwerpen, volledig lokale simulatie zonder NetLink |
 | Hoogtebediening | Tik kiest 1 cm; hold herhaalt; release houdt de doelhoogte vast; pas Bevestigen start de simulatie; grenzen 62–127 cm |
-| Paneel | Helderheid, dimtijd, 180°-rotatie en versienummer onder Meer → Paneel; instellingen zijn nog tijdelijk in RAM |
+| Paneel | Helderheid, dimtijd, 180°-rotatie en versienummer onder Meer → Paneel; lokale instellingen worden vanaf bronversie 0.8.0 gevalideerd en over herstarts bewaard (nog niet geïnstalleerd) |
 | Firmware 0.5.2 | Herstelt slepen op de helderheidsslider bij 180°-rotatie; regressietest geslaagd |
 | USB/wifi-bench | Mac/Linux-hostprogramma, begrensd JSON-protocol, simulator en geauthenticeerde versleutelde wifi-verbinding |
 | OTA | Dual-slot, hervatten en bootbevestiging/rollback geïmplementeerd; grotere firmwareoverdracht nog onvoldoende betrouwbaar; USB is de huidige installatieroute |
@@ -21,9 +21,13 @@ De lokale demo blijft bedienbaar zonder beheersessie. Monitorfuncties, voorkeure
 
 Zie [bediening en installatiegeschiedenis](docs/display-demo.md), [visuele QA](design-qa.md) en [de ontwerpen](docs/design/netlink-bedienpaneel.pdf). Eerdere bench- en OTA-rapporten bevatten historische resultaten; de tabel hierboven geeft de actuele projectstatus.
 
-## Read-only statuspad (0.7.0 in ontwikkeling)
+## Read-only statuspad (0.7.0 gemerged)
 
-De nieuwe firmwarecapability kan echte hoogte en geselecteerde monitorstatus vanuit `netlink-webserver` tonen. Er is geen Dell-monitor vereist; een Waveshare of een bureau zonder monitor blijft bruikbaar. Waarnemingen, laatst bekende waarden en onbekende status zijn onderscheiden. Alle apparaatbediening blijft geblokkeerd. Dit is gebouwd/testbaar PR-werk, nog niet op het fysieke display geïnstalleerd. Zie [het statuscontract](docs/production-protocol.md).
+De nieuwe firmwarecapability kan echte hoogte en geselecteerde monitorstatus vanuit `netlink-webserver` tonen. Er is geen Dell-monitor vereist; een Waveshare of een bureau zonder monitor blijft bruikbaar. Waarnemingen, laatst bekende waarden en onbekende status zijn onderscheiden. Alle apparaatbediening blijft geblokkeerd. Dit is gemerged en gebouwd/getest, nog niet op het fysieke display geïnstalleerd. Zie [het statuscontract](docs/production-protocol.md).
+
+## Firmware 0.8.0 in ontwikkeling
+
+Pijlknoppen tonen hun drukkleur alleen tijdens de aanraking; na loslaten blijven de gekozen doelhoogte en bevestiging staan. Fysieke wijzigingen van helderheid, dimtijd en rotatie worden bij loslaten opgeslagen, met schema, revisie en een vorige geldige configuratie als herstelpunt. Een mislukte opslag herstelt de eerder opgeslagen instellingen. De productie-status bevat alleen de opgeslagen configuratie en eventuele opslagfout; beheerde wijzigingen blijven geblokkeerd. Bureaupresets en wifi-credentials vallen buiten deze UI-configuratie. Zie [opslag, eigenaarschap en verificatie](docs/panel-settings.md).
 
 ## Demo proberen
 
