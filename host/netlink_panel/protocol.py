@@ -10,19 +10,19 @@ class ProtocolError(ValueError):
     pass
 
 
-def encode(message: dict) -> bytes:
-    payload = {"v": VERSION, **message}
-    validate(payload)
+def encode(message: dict, *, version: int = VERSION) -> bytes:
+    payload = {"v": version, **message}
+    validate(payload, version=version)
     frame = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode()
     if len(frame) > MAX_FRAME:
         raise ProtocolError("Frame exceeds 1024 bytes")
     return frame + b"\n"
 
 
-def validate(message: object) -> dict:
+def validate(message: object, *, version: int = VERSION) -> dict:
     if not isinstance(message, dict):
         raise ProtocolError("Expected object")
-    if type(message.get("v")) is not int or message["v"] != VERSION:
+    if type(message.get("v")) is not int or message["v"] != version:
         raise ProtocolError("Incompatible protocol version")
     if not isinstance(message.get("type"), str) or not message["type"]:
         raise ProtocolError("Missing message type")
@@ -32,7 +32,8 @@ def validate(message: object) -> dict:
 
 
 class Decoder:
-    def __init__(self):
+    def __init__(self, *, version: int = VERSION):
+        self.version = version
         self.buffer = bytearray()
         self.dropping = False
         self.rejected = 0
@@ -43,7 +44,7 @@ class Decoder:
             if byte == 10:
                 if not self.dropping and self.buffer:
                     try:
-                        messages.append(validate(json.loads(self.buffer)))
+                        messages.append(validate(json.loads(self.buffer), version=self.version))
                     except (ValueError, UnicodeDecodeError):
                         self.rejected += 1
                 self.buffer.clear()

@@ -1,5 +1,7 @@
 # Bench protocol v1
 
+Voor het productiecontract en de nieuwe USB-service: [protocol v2](production-protocol.md) en [USB panel-service](usb-service.md). Dit document beschrijft de oudere benchinterface.
+
 This is a diagnostic prototype, not the final NetLink command contract. No desk or monitor action is executable. USB and Wi-Fi share these application messages. The panel is the TLS-PSK client; the Mac bench tool is the server. See [Wi-Fi setup](wifi.md).
 
 Transport: UTF-8 JSON objects, one per newline, USB CDC serial at 115200 baud. Maximum frame length is 1024 bytes excluding the newline. On overflow discard through the next newline. Ignore malformed JSON, boot logs, and incompatible envelopes. Every message has integer `v: 1` and a nonempty string `type`. Request IDs are positive integers up to 2147483647. Do not replay actions after reconnect.
