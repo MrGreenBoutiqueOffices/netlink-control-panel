@@ -1,0 +1,29 @@
+# Standalone USB-only service example; not a NetLink fleet deployment.
+services:
+  panel:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    network_mode: none
+    user: "65532:65532"
+    group_add:
+      - "${PANEL_SERIAL_GID:?Set the host ttyACM device group GID}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    # Dynamic ttyACM names require /dev visibility. Cgroup + DAC restrict access;
+    # no block devices, raw USB, GPIO, desk UART or privileged mode are needed.
+    volumes:
+      - /dev:/dev:ro
+      - panel-data:/data
+    device_cgroup_rules:
+      - "c 166:* rw"
+    stop_grace_period: 5s
+    healthcheck:
+      test: ["CMD", "panel-service", "status"]
+      interval: 10s
+      timeout: 2s
+      retries: 2
+volumes:
+  panel-data:

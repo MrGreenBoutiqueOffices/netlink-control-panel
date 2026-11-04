@@ -12,10 +12,13 @@
 #include "frame_writer.h"
 #include "session_timeout.h"
 #include "panel_demo.h"
+#include "production_protocol.h"
 #include <mbedtls/base64.h>
 
 PanelOta ota;
 PanelDemo demo;
+ProductionSession production;
+char bootId[17];
 char otaStatus[40] = {};
 
 bool startupHealthy();
@@ -56,6 +59,7 @@ void render();
 void releaseSession(bool preserveTransfer = false) {
   if (!preserveTransfer) ota.abort();
   linked = false;
+  production.clear();
   active = Transport::None;
   wifiClient.stop();
   wifiInbox = Inbox{};
@@ -65,7 +69,7 @@ void releaseSession(bool preserveTransfer = false) {
 
 void sendTo(Transport target, JsonDocument &message) {
   static char frame[1025];
-  message["v"] = 1;
+  if (message["v"] != 2) message["v"] = 1;
   if (target == Transport::USB) writeJsonFrame(message, Serial, frame, sizeof(frame));
   else if (target == Transport::Wifi && wifiClient.connected()) {
     if (!writeJsonFrame(message, wifiClient, frame, sizeof(frame))) wifiClient.stop();
@@ -136,7 +140,28 @@ void applyWifi() {
 void receive(Transport source, const char *line) {
   StaticJsonDocument<1536> message;
   if (deserializeJson(message, line)) return;
+  if (message["v"].is<int>() && message["v"].as<int>() == 2) {
+    const char *kind = message["type"] | "";
+    if (!strcmp(kind, "heartbeat")) {
+      if (linked && source == active && production.matches(message)) lastHost = millis();
+      return;
+    }
+    if (!strcmp(kind, "hello")) {
+      // A production handshake must never interrupt an update or steal another session.
+      if (ota.receiving() || ota.pending() || ota.committed() ||
+          (linked && (source != active || !production.matches(message)))) {
+        StaticJsonDocument<256> error;error["session"]=message["session"];error["v"]=2;error["type"]="error";error["id"]=message["id"];error["code"]="busy";sendTo(source,error);return;
+      }
+    } else if (!linked || source != active) return;
+    StaticJsonDocument<1536> response;
+    StaticJsonDocument<384> boot;ota.describe(boot.to<JsonObject>());
+    bool accepted = production.handle(message,response,millis(),panelId,PANEL_FIRMWARE_VERSION,bootId,startupHealthy(),boot["state"] | "unknown");
+    if (response["id"].is<int>()) sendTo(source,response);
+    if (accepted) { active=source;linked=true;lastHost=millis(); }
+    return;
+  }
   if (!message["v"].is<int>() || message["v"].as<int>() != 1 || !message["type"].is<const char *>()) return;
+  if (linked && production.connected()) return; // v1 never renews or mutates a production session.
   const char *type = message["type"];
   if (!strcmp(type, "heartbeat")) {
     if (linked && source == active) lastHost = millis();
@@ -266,6 +291,7 @@ void setup() {
   // The default 256-byte queue can truncate a bulk response.
   Serial.setTxBufferSize(4096);
   Serial.begin(115200);
+  snprintf(bootId,sizeof(bootId),"%08lx%08lx",static_cast<unsigned long>(esp_random()),static_cast<unsigned long>(esp_random()));
   Serial.setTxTimeoutMs(100);
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
     if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) lastWifiDisconnectReason = info.wifi_sta_disconnected.reason;
@@ -308,6 +334,7 @@ void loop() {
     lastHeartbeat = now;
     StaticJsonDocument<128> heartbeat;
     heartbeat["type"] = "heartbeat"; heartbeat["uptime_ms"] = now;
+    if (production.connected()) { heartbeat["v"]=2;heartbeat["session"]=production.session; }
     sendTo(active, heartbeat);
   }
   if (now - lastTouchPoll >= 30) {
@@ -318,7 +345,7 @@ void loop() {
     if (pressed && !hadTouch) {
       int x = touch->rp_buf.pos_info[0].pos_y, y = 179 - touch->rp_buf.pos_info[0].pos_x;
       demo.touchDown(x, y, now);
-      if (linked && !demo.busy) {
+      if (linked && !production.connected() && !demo.busy) {
         StaticJsonDocument<160> event; event["type"] = "touch"; event["action"] = "demo_touch";
         event["x"] = x; event["y"] = y; sendTo(active, event);
       }
