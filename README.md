@@ -15,7 +15,7 @@ Firmware **0.8.0 uit broncommit `e8d2232` is via USB geïnstalleerd op het proto
 | USB/wifi-bench | Mac/Linux-hostprogramma, begrensd JSON-protocol, simulator en geauthenticeerde versleutelde wifi-verbinding |
 | OTA | Dual-slot, hervatten en bootbevestiging/rollback geïmplementeerd; grotere firmwareoverdracht nog onvoldoende betrouwbaar; USB is de huidige installatieroute |
 | Echte bediening | Nog geen NetLink panel-service, MQTT-koppeling of echte bureau-/monitorcommando’s |
-| Beheer en releases | PR-/main-controles en commitgebonden firmware-/protocolartifacts; versietags maken na controle een draft-release. Geen automatische flash of fleetdeploy; zie [releaseprocedure](docs/releases.md) |
+| Beheer en releases | PR-/main-controles en commitgebonden firmware-/protocolartifacts; Release Drafter beheert de draft en notities; na publicatie krijgt die release de gebouwde firmware-assets. Geen automatische flash of fleetdeploy; zie [releaseprocedure](docs/releases.md) |
 
 De lokale demo blijft bedienbaar zonder beheersessie. Monitorfuncties, voorkeuren, fouten en afstellen zijn voorbeeldgedrag, geen aansturing of detectie van echte apparatuur. De ingestelde paneelhelderheid schaalt de gerenderde pixels; fysieke backlightregeling is nog niet aangetoond.
 

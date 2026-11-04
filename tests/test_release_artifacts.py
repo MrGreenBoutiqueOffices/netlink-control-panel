@@ -28,7 +28,9 @@ class ReleaseArtifactTests(unittest.TestCase):
     def package(self, output, *, tag=None, version=VERSION, commit="1" * 40):
         firmware = output.parent / "firmware.bin"
         firmware.write_bytes(image_fixture(version=version))
-        return release.package(ROOT, firmware, output, commit, tag)
+        notes = output.parent / "release-notes.md"
+        notes.write_text("## What's changed\n\n- Firmware improvement (#29)\n")
+        return release.package(ROOT, firmware, output, commit, tag, notes if tag else None)
 
     def test_deterministic_artifacts_manifest_and_checksums(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -57,6 +59,22 @@ class ReleaseArtifactTests(unittest.TestCase):
             self.package(output)
             with self.assertRaisesRegex(ValueError, "empty"):
                 self.package(output)
+
+    def test_release_tag_controls_image_version_and_uses_drafter_notes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "output"
+            manifest = self.package(output, tag="v0.9.1", version="0.9.1")
+            self.assertEqual(manifest["firmware"]["version"], "0.9.1")
+            self.assertEqual(
+                (output / "RELEASE_NOTES.md").read_text(), "## What's changed\n\n- Firmware improvement (#29)\n"
+            )
+            for tag in ["main", "v01.2.3", 'v1.2.3"', "v1.2.3\nBAD=1", "v" + "1" * 32 + ".0.0"]:
+                with self.subTest(tag=tag), self.assertRaises(ValueError):
+                    release.release_version(tag)
+            firmware = Path(temp) / "release.bin"
+            firmware.write_bytes(image_fixture(version=VERSION))
+            with self.assertRaisesRegex(ValueError, "notes are required"):
+                release.package(ROOT, firmware, Path(temp) / "missing", "1" * 40, f"v{VERSION}")
 
     def test_changed_consumer_contract_and_corrupt_image_are_rejected(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -1,10 +1,10 @@
 # Firmwarecontroles en herleidbare releases
 
-Onderdeel van #23. Firmware/protocol blijven in `netlink-control-panel`; de bestaande webserver-container is de consumer. Er komt geen panel-service-image of extra deploymentpad. Deze workflow bouwt en publiceert reviewbare artifacts, en installeert geen firmware.
+Onderdeel van #23. Firmware/protocol blijven in `netlink-control-panel`; de bestaande webserver-container is de consumer. Er komt geen panel-service-image of extra deploymentpad. Release Drafter beheert de releasenotities en draft. Bij publicatie bouwt de firmwareworkflow assets voor die bestaande release; er wordt geen firmware geïnstalleerd.
 
 ## Controles op PR en main
 
-`.github/workflows/firmware.yml` draait op PR’s, main, versietags en handmatige workflowstart. De verify-job heeft uitsluitend leesrechten en voert uit:
+`.github/workflows/firmware.yml` draait op PR’s, main, gepubliceerde releases en handmatige workflowstart. Een losse tagpush start geen afzonderlijke publicatieflow. De verify-job heeft uitsluitend leesrechten en voert uit:
 
 1. `uv sync --locked --group dev`: de exacte Pythonpackages uit `uv.lock`, met vaste Ruff/PlatformIO/Pillow/PyMuPDF-versies.
 2. Ruff lint/format, Node-syntaxcontrole van de preview en niet-mutating regeneratie van de PDF/font-assets.
@@ -39,12 +39,12 @@ De uitvoermap moet leeg zijn; de packaging-CLI weigert wijzigingen aan tracked b
 | `firmware.bin` | Gevalideerde ESP32-S3-applicatie; geen merged-flash, bootloader, partities of credentials |
 | `manifest.json` | Bronrepo/commit/tag, firmwareversie, bestand- en imagehash, profiel/slotlimiet, protocol-/boardcompatibiliteit, inputdigests, artifactdigests en ondertekeningsstatus |
 | `protocol-core.tar.gz` | Afgebakende versie van `protocol.py` en geselecteerde transportonafhankelijke hostsymbolen, met provenance/digests |
-| `CHANGELOG.md` | Alleen de notities voor deze firmwareversie |
+| `RELEASE_NOTES.md` | Bij een release: de Release Drafter-body van de bestaande gepubliceerde release; bij PR/main: een CI-candidatemelding |
 | `SHA256SUMS` | SHA-256 van alle voorgaande bestanden, inclusief het manifest |
 
-De ESP-imageheader, segmentchecksums, appended imagehash, board-/partitiemarker, projectversie en firmwareheader worden gecontroleerd. Een tag moet exact `v<versie>` zijn. De versie moet een eigen changelogsectie hebben. Losse artifacts kunnen met `sha256sum --check SHA256SUMS` op overdrachtscorruptie worden gecontroleerd.
+De ESP-imageheader, segmentchecksums, appended imagehash en board-/partitiemarker worden gecontroleerd. Zonder release moeten image, projectversie en fallbackheader overeenkomen. Bij een gepubliceerde release is de gevalideerde tag `v<semver>` leidend: dezelfde versie wordt via een compilerdefine in scherm, handshake en image-marker verwerkt en moet in de gebouwde image terugkomen. De bronbestanden worden niet herschreven. De releasenotities komen uit GitHub; er is geen aparte handmatige changelog of verplichte versiecommit per release. Losse artifacts kunnen met `sha256sum --check SHA256SUMS` op overdrachtscorruptie worden gecontroleerd.
 
-Voor dezelfde broncommit en dezelfde firmwarebytes zijn packaging, manifest en protocolarchive deterministisch, inclusief archivevolgorde, metadata en gzip-tijdstip. De workflow claimt geen bitidentieke ESP-builds tussen verschillende besturingssystemen/toolchains; de daadwerkelijk gebouwde image wordt altijd met zijn eigen digests vastgelegd. Hashes zijn geen authenticiteitsbewijs en vervangen geen releasehandtekening.
+Voor dezelfde broncommit, firmwarebytes en releasenotities zijn packaging, manifest en protocolarchive deterministisch, inclusief archivevolgorde, metadata en gzip-tijdstip. De workflow claimt geen bitidentieke ESP-builds tussen verschillende besturingssystemen/toolchains; de daadwerkelijk gebouwde image wordt altijd met zijn eigen digests vastgelegd. Hashes zijn geen authenticiteitsbewijs en vervangen geen releasehandtekening.
 
 ## Protocolgrens en webserver
 
@@ -54,10 +54,14 @@ CI vergelijkt de gegenereerde bytes met de consumerselectie uit de gepinde webse
 
 Dit is een test van het protocolpakket en het vastgelegde consumercontract, geen volledige webserver-container-/fleettest. De private webserverrepository wordt niet met extra credentials vanuit PR-CI opgehaald. De webserver behoudt voorlopig zijn bestaande immutable broncommit en digestcontrole; overstappen op het releaseartifact vereist een eigen webserver-PR met commit/pakketversie/archivehash en bestaande consumer-/runtimechecks. De open webserver-PR’s en submodulepointers worden hier niet gewijzigd.
 
-## Draftrelease en deployment
+## Release Drafter en release-assets
 
-Na merge kan een maintainer bewust een tag `v<versie>` op een commit uit main pushen. Alle verify-stappen draaien opnieuw. De tag moet op main liggen en overeenkomen met de image/header/projectversie. Pas daarna downloadt een aparte job met `contents: write` het artifact, controleert `SHA256SUMS` en maakt een **draft-release** met de vijf bestanden. Bestaande releases worden niet overschreven. De maintainer controleert en publiceert de draft zelf; deze wijziging maakt geen tag of release aan.
+`.github/workflows/release-drafter.yaml` volgt de conventie uit de andere projecten: bij wijzigingen op main werkt Release Drafter de draft en categorieën bij op basis van de centrale organisatieconfiguratie. Er is geen lokale kopie van die configuratie en geen tweede workflow die zelf een release aanmaakt. Zolang nog geen gepubliceerde release bestaat, start de eerste draft bij de bestaande firmwarebaseline uit `pyproject.toml` (nu 0.8.0), zodat de bestaande versiereeks behouden blijft. Daarna bepaalt de centrale versie-resolver de volgende versie op basis van de vorige release en PR-labels.
 
-De artifacts zijn expliciet **unsigned**. Er is geen signingkey in PR-CI. Ondertekening en verifier/keyprovisioning horen bij #15 en moeten gereed zijn voordat een beheerde updater zulke artifacts als vertrouwd kan installeren. Een draft/published release of groene CI is geen fysieke installatie, OTA-acceptatie of toestemming voor beweging.
+De maintainer controleert en publiceert de Release Drafter-draft in GitHub. Het event `release.published` start vervolgens het volledige verify-/buildpad op de **exacte tag**, inclusief main-ancestrycontrole en validatie van tag/gebouwde image. De workflow bouwt dus uit de releasebron, niet uit de ondertussen veranderlijke main-branch. Het publicatie-event door een gebruiker start deze workflow; Release Drafter publiceert zelf niets.
+
+Na de controles downloadt een aparte job met `contents: write` het commitgebonden artifact, controleert `SHA256SUMS` en voegt de vijf bestanden met `gh release upload` aan **diezelfde bestaande release** toe. Titel en Release Drafter-body blijven behouden. De workflow gebruikt geen `gh release create` en overschrijft geen bestaande assets. Bij een mislukte upload kunnen al aanwezige assets blijven staan; onderzoek en herstel die gericht voordat je de upload herhaalt. Een gepubliceerde release heeft pas bruikbare firmware-assets als deze workflow geslaagd is. Er wordt geen tag of release door PR-CI aangemaakt.
+
+De artifacts zijn expliciet **unsigned**. Er is geen signingkey in PR-CI. Ondertekening en verifier/keyprovisioning horen bij #15 en moeten gereed zijn voordat een beheerde updater zulke artifacts als vertrouwd kan installeren. Een Release Drafter-draft, gepubliceerde release of groene CI is geen fysieke installatie, OTA-acceptatie of toestemming voor beweging.
 
 De bestaande fleet-first route blijft leidend: een reviewbare consumerpin gaat via de webserver-image naar NetLink develop/dev, acceptance en stable production. Alleen de agent/webserverrollen uit de bestaande architectuur worden gebruikt; er is geen rechtstreeks firmwaredeploy vanuit deze workflow. Artifactadoptie in de webserver en die rolloutacceptatie blijven open binnen #23/#15, naast de afzonderlijke hardware-/OTA-issues.

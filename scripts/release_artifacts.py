@@ -79,30 +79,42 @@ def protocol_core(root, commit):
     return output.getvalue(), manifest
 
 
-def package(root, firmware, output, commit, tag=None):
+def release_version(tag):
+    match = re.fullmatch(
+        r"v((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?)", tag
+    )
+    if not match or len(match[1]) > 31:
+        raise ValueError("Release tag must be v<semver> and fit the firmware version marker")
+    return match[1]
+
+
+def package(root, firmware, output, commit, tag=None, notes=None):
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("An exact Git source commit is required")
     image = inspect_image(firmware.read_bytes())
     version = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
     header = (root / "firmware/src/panel_version.h").read_text()
-    if image["version"] != version or f'#define PANEL_FIRMWARE_VERSION "{version}"' not in header:
-        raise ValueError("Firmware image, header and project version must match")
-    if tag is not None and tag != f"v{version}":
-        raise ValueError("Release tag must match the firmware version")
-    changelog = (root / "CHANGELOG.md").read_text()
-    section = re.search(rf"^## {re.escape(version)}\n(.*?)(?=^## |\Z)", changelog, re.M | re.S)
-    if section is None or not section[1].strip():
-        raise ValueError("Versioned changelog entry is required")
+    if f'#define PANEL_FIRMWARE_VERSION "{version}"' not in header:
+        raise ValueError("Fallback firmware header and project version must match")
+    expected = release_version(tag) if tag is not None else version
+    if image["version"] != expected:
+        raise ValueError("Firmware image must match the release tag or source fallback version")
+    if tag is not None and (notes is None or not notes.is_file()):
+        raise ValueError("Release Drafter notes are required for release packaging")
+    release_notes = (
+        notes.read_bytes() if notes is not None else b"CI candidate; release notes are managed by Release Drafter.\n"
+    )
     core, core_manifest = protocol_core(root, commit)
     files = {
         "firmware.bin": firmware.read_bytes(),
         "protocol-core.tar.gz": core,
-        "CHANGELOG.md": (section[1].strip() + "\n").encode(),
+        "RELEASE_NOTES.md": release_notes,
     }
     inputs = [
         "uv.lock",
         "pyproject.toml",
         "firmware/platformio.ini",
+        "firmware/release_version.py",
         "firmware/partitions.csv",
         "firmware/src/demo_assets.cpp",
         "scripts/prepare_firmware.py",
@@ -142,12 +154,21 @@ def package(root, firmware, output, commit, tag=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--firmware", type=Path, default=ROOT / "firmware/.pio/build/panel-bench/firmware.bin")
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--tag")
+    parser.add_argument("--notes", type=Path, help="Release Drafter body fetched from the published release")
+    parser.add_argument("--print-release-version", action="store_true")
     args = parser.parse_args()
+    if args.print_release_version:
+        if args.tag is None:
+            parser.error("--tag is required")
+        print(release_version(args.tag))
+        return
+    if args.output is None:
+        parser.error("--output is required")
     subprocess.run(["git", "diff", "--exit-code", "HEAD", "--"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    manifest = package(ROOT, args.firmware, args.output, commit, args.tag)
+    manifest = package(ROOT, args.firmware, args.output, commit, args.tag, args.notes)
     print(f"Packaged {manifest['firmware']['version']} from {commit}; unsigned, no installation performed")
 
 
