@@ -134,6 +134,32 @@ class ServiceTests(unittest.TestCase):
             with self.assertRaisesRegex(ServiceError, "peer_rejected_request"):
                 session.request("demo_ui")
 
+    def test_read_only_device_state_capability_validation_and_ack(self):
+        with NativePanel(self.binary) as panel:
+            session = self.session(panel)
+            self.assertIn("device.state.v1", session.handshake()["capabilities"])
+            fields = {
+                "revision": 1,
+                "valid_for_ms": 2000,
+                "desk": {"height_mm": 1086, "fresh": True},
+                "monitor": {"bus": "20", "brightness": 83, "power": "off", "source": "USBC", "fresh": False},
+            }
+            ack = session.request("device.state", fields=fields)
+            self.assertEqual((ack["type"], ack["revision"]), ("device.state.ack", 1))
+            self.assertEqual(session.snapshot()["state"]["mode"], "read_only")
+            for bad in (
+                {**fields},
+                {**fields, "revision": 2, "valid_for_ms": 3001},
+                {**fields, "revision": 2, "desk": {"height_mm": 9999, "fresh": True}},
+                {**fields, "revision": 2, "monitor": {**fields["monitor"], "brightness": 101}},
+            ):
+                with self.subTest(bad=bad), self.assertRaisesRegex(ServiceError, "peer_rejected_request"):
+                    session.request("device.state", fields=bad)
+            fields.update(revision=2, desk=None, monitor=None)
+            self.assertEqual(session.request("device.state", fields=fields)["revision"], 2)
+            with self.assertRaisesRegex(ServiceError, "reserved_request_field"):
+                session.request("device.state", fields={"session": "0" * 32})
+
     def test_wrong_identity_incompatible_and_unhealthy_are_rejected(self):
         for mode, reason in (
             ("wrong_identity", "panel_identity"),

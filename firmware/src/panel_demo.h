@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
+#include "device_state.h"
 
 // Self-contained local simulation. It has no desk, monitor or network transport.
 class PanelDemo {
@@ -17,6 +18,9 @@ class PanelDemo {
   int progress = 64;
   bool checkingUpdate = false;
   bool dirty = true, dimmed = false, busy = false;
+  bool readOnly = false;
+  PanelDeviceState deviceState;
+  void setDeviceState(const PanelDeviceState &value);
   void draw(uint16_t *pixels) const;
   void drawStatus(uint16_t *pixels, Screen phase, int percent, bool checking = false) const;
   void touchDown(int x, int y, uint32_t now);

@@ -21,6 +21,10 @@ De lokale demo blijft bedienbaar zonder beheersessie. Monitorfuncties, voorkeure
 
 Zie [bediening en installatiegeschiedenis](docs/display-demo.md), [visuele QA](design-qa.md) en [de ontwerpen](docs/design/netlink-bedienpaneel.pdf). Eerdere bench- en OTA-rapporten bevatten historische resultaten; de tabel hierboven geeft de actuele projectstatus.
 
+## Read-only statuspad (0.7.0 in ontwikkeling)
+
+De nieuwe firmwarecapability kan echte hoogte en geselecteerde monitorstatus vanuit `netlink-webserver` tonen. Er is geen Dell-monitor vereist; een Waveshare of een bureau zonder monitor blijft bruikbaar. Waarnemingen, laatst bekende waarden en onbekende status zijn onderscheiden. Alle apparaatbediening blijft geblokkeerd. Dit is gebouwd/testbaar PR-werk, nog niet op het fysieke display geïnstalleerd. Zie [het statuscontract](docs/production-protocol.md).
+
 ## Demo proberen
 
 Op het display: Meer opent Monitor, Voorkeuren en Paneel. Pijlen en presets kiezen alleen een doelhoogte. Annuleren verwerpt de keuze; Bevestigen start een lokale beweging. Een aanraking tijdens die beweging stopt de simulatie. De eerste aanraking na ruststand wekt alleen het scherm.
