@@ -1,5 +1,7 @@
 # Firmware bijwerken via wifi
 
+Zie [de full-image-diagnose van issue #14](ota-full-image.md) voor de voortgangsafhankelijke hostfix en de nog open fysieke matrix.
+
 Vanaf firmware 0.3.2 kan een lopende overdracht na tijdelijk verbindingsverlies worden hervat. Gebruik de bijbehorende actuele hosttool. Zie [de herstelcontrole](ota-recovery-2026-11-03.md) voor de daadwerkelijk uitgevoerde fysieke proeven en de resterende grenzen.
 
 ## Eén keer installeren, daarna draadloos
@@ -11,7 +13,7 @@ Stel daarna wifi in met `panel wifi setup` zoals beschreven in [wifi.md](wifi.md
 Voor volgende versies, vanuit de projectmap:
 
 ```sh
-uv tool run --from platformio==6.1.18 pio run --project-dir firmware
+uv run --locked pio run --project-dir firmware
 uv run panel wifi update
 ```
 
@@ -28,11 +30,13 @@ Stop eerst een eventueel draaiende `panel wifi serve`: beide programma's gebruik
 1. De Mac controleert de ESP32-S3-chipidentiteit, applicatiedescriptor, segmentlengtes, checksum, SHA-256 en de ingebouwde NetLink-bord/protocol/partitie-identiteit. Een bootloader, samengevoegde flashdump, beschadigde image of verkeerd bord wordt geweigerd voordat de netwerkserver start.
 2. Alleen het gekoppelde paneel kan via de bestaande wederzijds geauthenticeerde TLS-PSK-verbinding verbinden. De Mac controleert ook paneelidentiteit, updateondersteuning en startup-self-check.
 3. Het paneel registreert de draaiende image als bekende geldige terugvalversie als de initiële USB-flash nog geen OTA-selectie had. Het schrijft daarna uitsluitend naar het andere applicatieslot. NVS, bootloader, partities en wifigegevens worden niet bijgewerkt.
-4. Elk blok van maximaal 512 bytes moet op de verwachte positie worden bevestigd. Vanaf capability `ota_resume_v1` bewaart het paneel bij wifi/TLS-verlies de flashhandle, schrijfpositie en lopende hash maximaal 60 seconden zonder transferactiviteit. De host verbindt maximaal vijf keer opnieuw binnen de totale deadline (standaard 600 seconden). Een herhaald `ota_begin` voor exact dezelfde grootte, beide hashes, profiel en versie retourneert de werkelijk geschreven positie, zonder opnieuw te wissen. De host valideert die positie en verstuurt alleen het resterende deel. Bij een verlopen lease of paneelherstart begint de image opnieuw vanaf nul; de huidige geldige boot blijft geselecteerd. Een andere actieve image wordt geweigerd. USB-overname en expliciet afbreken ruimen de transfer direct op.
+4. Elk blok van maximaal 512 bytes moet op de verwachte positie worden bevestigd. Vanaf capability `ota_resume_v1` bewaart het paneel bij wifi/TLS-verlies de flashhandle, schrijfpositie en lopende hash maximaal 60 seconden zonder transferactiviteit. De host staat maximaal vijf herstelpogingen zonder nieuwe bevestigde bytes toe. Alleen een hoger bevestigd offset geeft opnieuw herstelruimte; gelijke of teruggezette offsets doen dat niet. Het totale aantal herverbindingen mag daardoor hoger dan vijf zijn, binnen dezelfde vaste deadline (standaard 600 seconden). Herhaald verloren activatieverzoeken vallen onder hetzelfde begrensde budget. Een herhaald `ota_begin` voor exact dezelfde grootte, beide hashes, profiel en versie retourneert de werkelijk geschreven positie, zonder opnieuw te wissen. De host valideert die positie en verstuurt alleen het resterende deel. Bij een verlopen lease of paneelherstart begint de image opnieuw vanaf nul; de huidige geldige boot blijft geselecteerd. Een andere actieve image wordt geweigerd. USB-overname en expliciet afbreken ruimen de transfer direct op.
 5. Pas na controle van de totale lengte, SHA-256, ingebouwde image-identiteit en ESP-imagevalidatie wordt de bootselectie gewijzigd en herstart het paneel.
 6. De nieuwe firmware is eerst onbevestigd. Het paneel moet opnieuw via TLS verbinden, de verwachte imagehash en versie melden en de startup-self-check doorstaan. De Mac vraagt dan om expliciete bootbevestiging en leest de bevestigde status nogmaals uit.
 
 De startup-self-check controleert buffer/display-initialisatie en een uitgelezen touchcontrolleridentiteit. Dit bewijst geen juiste pixels, schermoriëntatie of touchcoördinaten; die blijven fysieke tests.
+
+Het ontvangstbewijs bewaart fase, verstreken tijd, hoogste bevestigde positie en huidige positie, netto voortgang per seconde, totaal aantal recoveries, de stilstandsbudgetstand en maximaal 32 geschoonde sessiemetingen (firmware, uptime/resetreden, RSSI/wifi-disconnectreden indien aanwezig, TLS- en hello-duur). Overgeslagen oudere sessiemetingen worden geteld. Credentials, netwerknaam, IP en protocolframes worden niet gekopieerd.
 
 Alleen `ota_confirmed` en exitcode 0 betekenen dat de host de verwachte image en bevestigde boot heeft gezien. Het resultaat staat ook in `artifacts/last-update.json`. Tijdens uploaden zijn de touchknoppen geblokkeerd. Dit prototype bestuurt nog geen echt bureau of monitor.
 
