@@ -29,6 +29,27 @@ Arduino_ESP32QSPI bus(12, 17, 13, 18, 21, 14);
 Arduino_AXS15231 display(&bus, 16, 0, false, 180, 640);
 Arduino_Canvas canvas(WIDTH, HEIGHT, nullptr);
 Preferences preferences;
+class SettingsStorage {
+ public:
+  Preferences nvs;
+  bool ready = false;
+  static const char *key(int slot) { return slot == 0 ? "ui0" : "ui1"; }
+  bool read(int slot, uint8_t *bytes, size_t size) { return ready && nvs.getBytesLength(key(slot)) == size && nvs.getBytes(key(slot), bytes, size) == size; }
+  bool write(int slot, const uint8_t *bytes, size_t size) { return ready && nvs.putBytes(key(slot), bytes, size) == size; }
+} settingsStorage;
+PanelSettingsJournal<SettingsStorage> settings(settingsStorage);
+PanelSettings gestureSettings;
+
+void persistLocalSettings() {
+  PanelSettings value=demo.settings();
+  if(value==gestureSettings)return;
+  if(!settings.save(value))demo.applySettings(settings.applied);
+}
+void describeSettings(JsonObject out) {
+  out["schema"]=1;out["revision"]=settings.revision;
+  out["brightness"]=settings.applied.brightness;out["rotated"]=settings.applied.rotated;out["dim_minutes"]=settings.applied.dimMinutes;
+  out["writable"]=settingsStorage.ready && settings.writable;out["write_failed"]=settings.writeFailed;
+}
 WiFiClientSecure wifiClient;
 IPAddress serverAddress;
 String wifiSSID, wifiPassword, wifiKey;
@@ -157,6 +178,8 @@ void receive(Transport source, const char *line) {
     StaticJsonDocument<1536> response;
     StaticJsonDocument<384> boot;ota.describe(boot.to<JsonObject>());
     bool accepted = production.handle(message,response,millis(),panelId,PANEL_FIRMWARE_VERSION,bootId,startupHealthy(),boot["state"] | "unknown");
+    if(accepted && !strcmp(kind,"hello"))response["capabilities"].add("panel.config.status.v1");
+    if(accepted && !strcmp(kind,"state.get"))describeSettings(response["state"]["panel_config"].to<JsonObject>());
     if (response["id"].is<int>()) sendTo(source,response);
     if (accepted) { active=source;linked=true;lastHost=millis();demo.setDeviceState(production.devices); }
     return;
@@ -231,10 +254,11 @@ void receive(Transport source, const char *line) {
     else if (!strcmp(op, "height")) { int mm = message["height_mm"] | -1; ok = message["height_mm"].is<int>() && PanelDemo::validHeight(mm); if(ok) demo.setHeight(mm); }
     else if (strcmp(op, "status")) ok = false;
     if (ok && strcmp(op, "status")) render();
-    StaticJsonDocument<384> response; response["type"] = "ack"; response["id"] = id; response["ok"] = ok;
+    StaticJsonDocument<768> response; response["type"] = "ack"; response["id"] = id; response["ok"] = ok;
     response["mode"] = "standalone_demo"; response["screen"] = demo.name(); response["height_mm"] = demo.height; response["target_mm"] = demo.target;
     response["min_height_mm"] = PanelDemo::MinHeightMm; response["max_height_mm"] = PanelDemo::MaxHeightMm;
     response["sit_mm"] = demo.sit; response["stand_mm"] = demo.stand; response["monitor"] = demo.monitor;
+    describeSettings(response["panel_config"].to<JsonObject>());
     response["brightness"] = demo.brightness; response["rotated"] = demo.rotated; response["connected"] = demo.connected;
     sendTo(source, response); lastHost = millis();
   } else if (!strcmp(type, "demo_frame")) {
@@ -298,6 +322,8 @@ void setup() {
     if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) lastWifiDisconnectReason = info.wifi_sta_disconnected.reason;
   });
   snprintf(panelId, sizeof(panelId), "panel-%012llx", ESP.getEfuseMac());
+  settingsStorage.ready=settingsStorage.nvs.begin("panel-ui",false);
+  settings.load();demo.applySettings(settings.applied);
   ota.bootStart();
   pinMode(1, OUTPUT); digitalWrite(1, LOW);
   nativePixels = static_cast<uint16_t *>(ps_malloc(WIDTH * HEIGHT * sizeof(uint16_t)));
@@ -307,6 +333,7 @@ void setup() {
   digitalWrite(1, HIGH);
   if (preferences.begin("panel-wifi", false)) applyWifi();
   demo.scene(0,millis());
+  demo.applySettings(settings.applied);
   render();
 }
 
@@ -346,6 +373,7 @@ void loop() {
     demo.setBusy(ota.receiving() || ota.pending() || ota.committed());
     if (pressed && !hadTouch) {
       int x = touch->rp_buf.pos_info[0].pos_y, y = 179 - touch->rp_buf.pos_info[0].pos_x;
+      gestureSettings=demo.settings();
       demo.touchDown(x, y, now);
       if (linked && !production.connected() && !demo.busy) {
         StaticJsonDocument<160> event; event["type"] = "touch"; event["action"] = "demo_touch";
@@ -353,7 +381,7 @@ void loop() {
       }
     }
     if (pressed && hadTouch) demo.touchMove(touch->rp_buf.pos_info[0].pos_y, 179 - touch->rp_buf.pos_info[0].pos_x, now);
-    if (!pressed && hadTouch) demo.touchUp(now);
+    if (!pressed && hadTouch) { demo.touchUp(now);persistLocalSettings(); }
     hadTouch = pressed;
   }
   demo.setBusy(ota.receiving() || ota.pending() || ota.committed());

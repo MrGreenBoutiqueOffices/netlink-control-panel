@@ -91,3 +91,7 @@ Het display toont gemeten hoogte en helderheid/power/ingang; `fresh:false` krijg
 `state.snapshot.state.mode` blijft vóór de eerste `device.state` voor oude hosts `standalone_demo`; daarna is het `read_only`, ook na leaseverloop. De bijgewerkte hostcore accepteert beide modes. Nieuwe host plus oude firmware behoudt statusbewaking maar verstuurt geen apparaatstatus. Installeer host en firmware daarom als gekoppelde, capability-gecontroleerde wijzigingen.
 
 De webserver blijft eigenaar van MQTT-status. De upstream hostmodule krijgt alleen generieke requestvelden en modecompatibiliteit; de webserver gebruikt daarvoor de bestaande SerialX-adapter, zonder pySerial terug toe te voegen. Firmware 0.7.0 wordt in deze wijziging gebouwd en native getest, niet automatisch op het fysieke paneel geïnstalleerd.
+
+## Lokale paneelconfiguratiestatus vanaf 0.8.0
+
+De optionele capability `panel.config.status.v1` voegt `state.panel_config` toe aan de bestaande snapshot. Deze bevat schema, opgeslagen revisie, paneelhelderheid, rotatie, dimtijd en begrensde opslagstatus. Geen credentials, bureaupresets of beheerde writes. Zie [het opslag- en eigenaarschapscontract](panel-settings.md). Onbekende configuratieverzoeken blijven geweigerd; dit verleent geen extra apparaat- of configuratierechten.
