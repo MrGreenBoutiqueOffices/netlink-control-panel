@@ -1,0 +1,73 @@
+---
+name: Release
+
+# yamllint disable rule:line-length
+# yamllint disable-line rule:truthy
+on:
+  release:
+    types:
+      - published
+
+env:
+  DEFAULT_PYTHON: "3.14"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Releasing firmware assets
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: 🏗 Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: false
+          python-version: ${{ env.DEFAULT_PYTHON }}
+      - name: 🐍 Install Python
+        run: uv python install
+      - name: 🏗 Install dependencies
+        run: uv sync --locked
+      - name: 🏗 Set firmware version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git merge-base --is-ancestor HEAD origin/main
+          version=$(uv run --locked python scripts/release_artifacts.py --tag "$RELEASE_TAG" --print-release-version)
+          echo "PANEL_RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+      - name: 🏗 Prepare firmware dependencies
+        run: uv run --locked python scripts/prepare_firmware.py
+      - name: 🏗 Build firmware
+        run: uv run --locked pio run --project-dir firmware
+      - name: 🚀 Run host and native firmware tests
+        run: uv run --locked python scripts/check_tests.py
+      - name: 🏗 Package release assets
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          mkdir -p artifacts
+          uv run --locked python -c 'import os; from pathlib import Path; Path("artifacts/release-notes.md").write_text(os.environ["RELEASE_BODY"], encoding="utf-8")'
+          uv run --locked python scripts/release_artifacts.py --tag "$RELEASE_TAG" --notes artifacts/release-notes.md --output artifacts/release
+      - name: 🚀 Verify release asset checksums
+        working-directory: artifacts/release
+        run: sha256sum --check SHA256SUMS
+      - name: 🚀 Publish firmware assets to release
+        uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de # 2.11.5
+        with:
+          file: artifacts/release/*
+          file_glob: true
+          release_id: ${{ github.event.release.id }}
+          tag: ${{ github.event.release.tag_name }}
+          overwrite: false
+          check_duplicates: false

@@ -4,15 +4,20 @@ Onderdeel van #23. Firmware/protocol blijven in `netlink-control-panel`; de best
 
 ## Controles op PR en main
 
-`.github/workflows/firmware.yml` draait op PR’s, main, gepubliceerde releases en handmatige workflowstart. Een losse tagpush start geen afzonderlijke publicatieflow. De verify-job heeft uitsluitend leesrechten en voert uit:
+De workflowstructuur volgt `python-netlink` en `python-balena-cloud`:
 
-1. `uv sync --locked --group dev`: de exacte Pythonpackages uit `uv.lock`, met vaste Ruff/PlatformIO/Pillow/PyMuPDF-versies.
-2. Ruff lint/format, Node-syntaxcontrole van de preview en niet-mutating regeneratie van de PDF/font-assets.
-3. Voorbereiding van de immutable LILYGO-revisie met uitgeschakelde automatische touchcontrollerflash; firmwarebuild met vaste platform/library/framework/toolversies.
-4. Alle Python- en native C++-tests. Een ontbrekende compiler, ArduinoJson-headers of TLS-PSK-capability mag niet in een groene CI met overgeslagen tests eindigen.
-5. Packaging en contractcontrole van de firmware en het protocolpakket, gevolgd door een commitgebonden GitHub Actions-artifact `panel-<commit>` (30 dagen beschikbaar).
+| Workflow | Trigger en verantwoordelijkheid |
+| --- | --- |
+| `linting.yaml` — Linting | Push, PR en handmatig; aparte Ruff-, yamllint- en asset/preview-jobs |
+| `tests.yaml` — Testing | Push, PR en handmatig; Python-job met firmwarebuild, alle host/native tests en commitgebonden candidate-artifacts |
+| `release-drafter.yaml` — Release Drafter | Main en handmatig; standaardactie met de centrale organisatieconfiguratie |
+| `release.yaml` — Release | `release.published`; één firmware-releasejob in de `release`-environment |
 
-GitHub Actions zijn op commit-SHA gepind; uv, Python en Node hebben vaste versies. De runner is Ubuntu 24.04. De generator legt de BASIC-lettertypelayout expliciet vast op macOS en Linux. PNG-referenties worden op identieke afmetingen en RGBA-pixels gecontroleerd, zodat verschillen in lossless PNG-compressie/metadata geen valse drift geven; de embedded C++-arrays moeten byte voor byte gelijk blijven.
+De jobs gebruiken `DEFAULT_PYTHON`, `ubuntu-latest`, setup-uv, expliciet `uv python install` en `uv sync --locked`, zoals de packageprojecten. Lint/test gebruiken uv-cache; de releasejob schakelt die uit. `contents: read` is de standaard; alleen de draft- en releasejobs krijgen de benodigde schrijfrechten. De Actions zijn op dezelfde commit-SHA’s gepind als de voorbeelden. De huidige firmwaretestbaseline is Python 3.14 met TLS-PSK; de runner gebruikt de actuele patchversie van die Pythonreeks.
+
+De functionele controles blijven firmwaregericht: vaste Python-/PlatformIO-/libraryversies, immutable LILYGO-bronnen met automatische touchcontrollerflash uitgeschakeld, echte C++-protocol/UI-tests, previewsyntax en geschoonde artifacts. Ontbrekende compiler/ArduinoJson/TLS-PSK of overgeslagen tests leveren geen groene testjob op. `tests.yaml` uploadt een artifact `panel-<commit>` met 30 dagen bewaartermijn.
+
+De generator legt de BASIC-lettertypelayout expliciet vast op macOS en Linux. PNG-referenties worden op identieke afmetingen en RGBA-pixels gecontroleerd; de embedded C++-arrays moeten byte voor byte gelijk blijven.
 
 De bestaande lokale systeemtests blijven bruikbaar op een machine zonder alle CI-voorwaarden, maar `scripts/check_tests.py` accepteert geen skips.
 
@@ -22,6 +27,7 @@ Lokaal hetzelfde controlepad:
 uv sync --locked --group dev
 uv run --locked ruff check .
 uv run --locked ruff format --check .
+uv run --locked yamllint .github .yamllint
 node --check preview/app.js
 uv run --locked python scripts/generate_demo_assets.py --check
 uv run --locked python scripts/prepare_firmware.py
@@ -56,11 +62,11 @@ Dit is een test van het protocolpakket en het vastgelegde consumercontract, geen
 
 ## Release Drafter en release-assets
 
-`.github/workflows/release-drafter.yaml` volgt de conventie uit de andere projecten: bij wijzigingen op main werkt Release Drafter de draft en categorieën bij op basis van de centrale organisatieconfiguratie. Er is geen lokale kopie van die configuratie en geen tweede workflow die zelf een release aanmaakt. Zolang nog geen gepubliceerde release bestaat, start de eerste draft bij de bestaande firmwarebaseline uit `pyproject.toml` (nu 0.8.0), zodat de bestaande versiereeks behouden blijft. Daarna bepaalt de centrale versie-resolver de volgende versie op basis van de vorige release en PR-labels.
+`release-drafter.yaml` gebruikt dezelfde minimale job als `python-balena-cloud`: één Release Drafter-actie op main of een handmatige run, met de geërfde centrale categorieën en versie-resolver. Er is geen checkout, eigen versie-initialisatie of lokale kopie van de configuratie. Omdat deze repository nog geen gepubliceerde release heeft, moet de maintainer bij de eerste draft de gewenste startversie controleren; voor voortzetting van de huidige firmwarelijn is dat v0.8.0. Daarna volgt de versie de bestaande releasehistorie en PR-labels.
 
-De maintainer controleert en publiceert de Release Drafter-draft in GitHub. Het event `release.published` start vervolgens het volledige verify-/buildpad op de **exacte tag**, inclusief main-ancestrycontrole en validatie van tag/gebouwde image. De workflow bouwt dus uit de releasebron, niet uit de ondertussen veranderlijke main-branch. Het publicatie-event door een gebruiker start deze workflow; Release Drafter publiceert zelf niets.
+De maintainer controleert en publiceert de draft in GitHub. `release.yaml` start op `release.published`, zoals de package-releaseworkflow. De releasejob draait in de `release`-environment en checkt de **exacte releasetag** uit. Hij valideert main-ancestry en de versie, stelt de firmwareversie voor de build in, bouwt de image en draait de host/native tests. Er is geen tweede publicatie-/uploadjob en er is geen artifactoverdracht tussen workflows nodig.
 
-Na de controles downloadt een aparte job met `contents: write` het commitgebonden artifact, controleert `SHA256SUMS` en voegt de vijf bestanden met `gh release upload` aan **diezelfde bestaande release** toe. Titel en Release Drafter-body blijven behouden. De workflow gebruikt geen `gh release create` en overschrijft geen bestaande assets. Bij een mislukte upload kunnen al aanwezige assets blijven staan; onderzoek en herstel die gericht voordat je de upload herhaalt. Een gepubliceerde release heeft pas bruikbare firmware-assets als deze workflow geslaagd is. Er wordt geen tag of release door PR-CI aangemaakt.
+De releasebody uit het publicatie-event wordt als `RELEASE_NOTES.md` meegenomen. De job verpakt de image, controleert `SHA256SUMS` en uploadt de vijf bestanden met `svenstaro/upload-release-action` naar de bestaande release-ID. De bestaande Release Drafter-titel en -body blijven behouden. Assets worden niet overschreven; dubbele namen laten de upload falen. Bij een gedeeltelijk mislukte upload blijven mogelijk assets staan; controleer die vóór een nieuwe poging. Een release heeft pas bruikbare firmware-assets als de releasejob geslaagd is. PR-/testworkflows maken geen tags of releases aan.
 
 De artifacts zijn expliciet **unsigned**. Er is geen signingkey in PR-CI. Ondertekening en verifier/keyprovisioning horen bij #15 en moeten gereed zijn voordat een beheerde updater zulke artifacts als vertrouwd kan installeren. Een Release Drafter-draft, gepubliceerde release of groene CI is geen fysieke installatie, OTA-acceptatie of toestemming voor beweging.
 
