@@ -1,23 +1,23 @@
-# Voorbereiding van openbaarmaking
+# Publication readiness
 
-Status op 2026-11-05: gekozen licentie voor de eigen projectcode is **GPL-3.0-only**. De repository blijft privé totdat de onderstaande distributiepunten zijn opgelost. Deze documentatie en licentiewijziging veranderen de GitHub-zichtbaarheid niet.
+Status on 2026-11-05: the chosen license for the project's own code is **GPL-3.0-only**. The repository remains private until the distribution issues below are resolved. These documentation and license changes do not change GitHub visibility.
 
-De resterende punten worden gevolgd in [#34](https://github.com/MrGreenBoutiqueOffices/netlink-control-panel/issues/34).
+The remaining items are tracked in [#34](https://github.com/MrGreenBoutiqueOffices/netlink-control-panel/issues/34).
 
-## Gecontroleerd
+## Checked
 
-- De repository had nog geen projectlicentie. `LICENSE`, de README en de Python-package metadata leggen nu dezelfde keuze vast. Auteursrechten worden niet naar een andere persoon of rechtspersoon overgedragen.
-- Een offline `detect-secrets` 1.5.0-scan van 178 unieke tekstblobs uit de toen opgehaalde lokale Git-geschiedenis vond geen mogelijke secrets. Er zijn geen netwerkverificaties van kandidaten uitgevoerd. Dit is een begrensde scan, geen garantie dat elk type geheim of gevoelige informatie afwezig is.
-- `.secrets/`, `artifacts/`, `firmware/.vendor/` en `firmware/.pio/` zijn geen tracked repositorybestanden. GitHub heeft wel al release-assets en Actions-artifacts; die zijn afzonderlijke distributies en worden niet door `.gitignore` beschermd.
-- Inter heeft een meegeleverde OFL-licentie. De build haalt daarnaast de gepinde LILYGO-bron en SDK/dependencies op; zie [third-party-vermeldingen](../THIRD_PARTY_NOTICES.md).
+- The repository previously had no project license. `LICENSE`, the README and Python package metadata now record the same choice. Copyright is not transferred to another individual or legal entity.
+- An offline `detect-secrets` 1.5.0 scan of 178 unique text blobs from the locally fetched Git history found no potential secrets. Candidates were not verified over the network. This is a bounded scan, not a guarantee that every type of secret or sensitive information is absent.
+- `.secrets/`, `artifacts/`, `firmware/.vendor/` and `firmware/.pio/` are not tracked repository files. GitHub already has release assets and Actions artifacts; these are separate distributions and are not protected by `.gitignore`.
+- Inter includes its OFL license. The build also downloads pinned LILYGO source and SDK/dependencies; see [third-party notices](../THIRD_PARTY_NOTICES.md).
 
-## Nog nodig vóór publiek zetten
+## Still required before making the repository public
 
-1. Stel de licentie/distributietoestemming vast van de Hynitron-touchdriver in de gepinde LILYGO-bron. In de geraadpleegde root en drivermap ontbreekt een duidelijke licentievermelding. GPL voor onze eigen code lost dit niet op. Alternatieven zijn aantoonbare toestemming of een vervangende driver met passende licentie; er is nog geen upstream-bericht verstuurd.
-2. Stel voor de exacte Arduino_GFX-vendorcopy de toepasselijke notices vast en verzamel de overige notices van de daadwerkelijk meegebouwde componenten. Een licentietekst van de huidige upstream is niet automatisch bewijs voor die vendorcopy.
-3. Zorg bij de firmware-assets en het protocol-core-archive voor de toepasselijke licenties, corresponderende broncode en reproduceerbare buildinformatie; lever waar GPL dat vereist ook installatie-informatie om eigen aangepaste software te kunnen installeren. De bestaande USB-herstelroute en de OTA-signingpolicy moeten hierin expliciet worden meegenomen. Productiesigningkeys of pairinggegevens worden niet als vanzelf openbaar gemaakt.
-4. Controleer ook de bestaande releases, Actions-artifacts en Actions-logs op distributievoorwaarden en gevoelige inhoud voordat de zichtbaarheid wijzigt. De lokale Git-scan omvatte deze externe bestanden en logs niet. Er zijn geen oude assets of runs verwijderd.
+1. Establish the license/distribution permission for the Hynitron touch driver in the pinned LILYGO source. The inspected root and driver directory lack a clear license notice. GPL for our own code does not resolve this. Alternatives are demonstrable permission or a replacement driver with a suitable license; no upstream message has been sent.
+2. Establish applicable notices for the exact Arduino_GFX vendor copy and collect the other notices for the components actually compiled. A license text from current upstream is not automatically evidence for that vendor copy.
+3. Provide applicable licenses, corresponding source and reproducible build information with the firmware assets and protocol-core archive; where required by GPL, also provide installation information for installing modified software. The existing USB recovery route and OTA signing policy must be addressed explicitly. Production signing keys or pairing details are not made public by default.
+4. Review existing releases, Actions artifacts and Actions logs for distribution conditions and sensitive content before changing visibility. The local Git scan did not include these external files and logs. No old assets or runs were deleted.
 
-Wanneer deze punten zijn opgelost, kunnen releases van deze repository rechtstreeks als publieke updatebron dienen. Een aparte firmware-repository of updateserver is dan niet nodig. Het paneel moet nog steeds lokaal de onafhankelijke releasehandtekening en compatibiliteit controleren; openbaar downloaden verleent geen installatievertrouwen.
+Once these items are resolved, releases from this repository can directly serve as a public update source. No separate firmware repository or update server is needed. The panel must still verify the independent release signature and compatibility locally; public download access does not establish installation trust.
 
-Bronnen: [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html), [GPL-3.0-only SPDX-tekst](https://github.com/spdx/license-list-data/blob/main/text/GPL-3.0-only.txt), [GitHub-zichtbaarheid en openbare Actions-geschiedenis](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility), [gepinde LILYGO-bron](https://github.com/Xinyuan-LilyGO/T-Display-S3-Long/tree/3deece89098f25e7d155e41e4e0f5dd8b368ab02).
+Sources: [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html), [GPL-3.0-only SPDX text](https://github.com/spdx/license-list-data/blob/main/text/GPL-3.0-only.txt), [GitHub visibility and public Actions history](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility), [pinned LILYGO source](https://github.com/Xinyuan-LilyGO/T-Display-S3-Long/tree/3deece89098f25e7d155e41e4e0f5dd8b368ab02).

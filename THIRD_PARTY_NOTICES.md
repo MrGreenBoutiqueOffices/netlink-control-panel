@@ -1,26 +1,26 @@
-# Onderdelen van derden
+# Third-party components
 
-`LICENSE` geldt voor de eigen projectcode. Bestaande auteursrechten, licenties en eventuele aanvullende voorwaarden van derden blijven gelden. Deze inventaris is geen volledige verzameling van alle licentieteksten van een firmwarebuild en geeft geen nieuwe rechten op upstream-code.
+`LICENSE` applies to the project's own code. Existing third-party copyrights, licenses and any additional conditions remain in effect. This inventory is not a complete collection of all license texts for a firmware build and grants no new rights to upstream code.
 
-## In deze repository opgenomen
+## Included in this repository
 
-- **Inter**: Copyright 2020 The Inter Project Authors. Het font `preview/assets/inter.ttf` en de daarvan gegenereerde embedded glyphs blijven onder de SIL Open Font License 1.1. De volledige licentie staat in [preview/assets/OFL.txt](preview/assets/OFL.txt).
-- **Ontwerpen en pictogrammen**: aangeleverd voor dit project; de herkomst en uitsneden zijn beschreven in [preview/assets/README.md](preview/assets/README.md). Deze vermelding kent geen rechten toe op eventuele merken of materiaal van derden in de ontwerpen.
+- **Inter**: Copyright 2020 The Inter Project Authors. The font `preview/assets/inter.ttf` and its generated embedded glyphs remain under the SIL Open Font License 1.1. The full license is in [preview/assets/OFL.txt](preview/assets/OFL.txt).
+- **Designs and icons**: supplied for this project; their origins and crops are described in [preview/assets/README.md](preview/assets/README.md). This notice grants no rights to any trademarks or third-party material in the designs.
 
-## Door de build opgehaalde software
+## Software fetched by the build
 
-De build haalt dependencies op; `firmware/.vendor/` en `firmware/.pio/` worden niet in Git opgenomen. Downloaden maakt hun licentievoorwaarden niet gelijk aan die van deze repository.
+The build downloads dependencies; `firmware/.vendor/` and `firmware/.pio/` are not tracked in Git. Downloading them does not make their license terms identical to this repository's terms.
 
-| Onderdeel | Vastgestelde informatie / te behouden vermelding |
+| Component | Established information / notices to retain |
 | --- | --- |
-| ArduinoJson 6.21.5 | MIT, Benoit BLANCHON; volledige upstream-licentietekst bij distributie behouden |
-| Arduino ESP32 core 2.0.14 | De geraadpleegde core-header vermeldt LGPL-2.1-or-later; SDK, libraries en andere componenten hebben eigen voorwaarden |
-| ESP-IDF / mbedTLS | Componentlicenties en notices uit de exacte gebruikte SDK behouden; de applicatie-GPL vervangt ze niet |
-| Arduino_GFX 1.3.7 uit de gepinde LILYGO-bron | De huidige afzonderlijke upstream heeft een BSD-licentietekst; die is nog niet als bewijs voor deze exacte vendorcopy vastgesteld. Exacte herkomst en mee te leveren notices blijven een publicatiepunt |
-| Hynitron-touchdriver uit de gepinde LILYGO-bron | In de geraadpleegde gepinde repositoryroot en drivermap is geen duidelijke licentievermelding gevonden. Distributietoestemming is nog niet vastgesteld |
-| Python `cryptography` 50.0.2 | Package metadata: `Apache-2.0 OR BSD-3-Clause`; eigen notices en eventuele meegeleverde componentlicenties behouden |
-| Python `pyserial` 3.5 | Package metadata: BSD; de licentie en vermeldingen uit de gebruikte distributie behouden |
+| ArduinoJson 6.21.5 | MIT, Benoit BLANCHON; retain the full upstream license text when distributing |
+| Arduino ESP32 core 2.0.14 | The inspected core header states LGPL-2.1-or-later; the SDK, libraries and other components have their own terms |
+| ESP-IDF / mbedTLS | Retain component licenses and notices from the exact SDK used; the application's GPL does not replace them |
+| Arduino_GFX 1.3.7 from the pinned LILYGO source | Current standalone upstream has a BSD license text; it has not yet been established as evidence for this exact vendor copy. Exact provenance and notices to supply remain a publication item |
+| Hynitron touch driver from the pinned LILYGO source | No clear license notice was found in the inspected pinned repository root and driver directory. Distribution permission has not been established yet |
+| Python `cryptography` 50.0.2 | Package metadata: `Apache-2.0 OR BSD-3-Clause`; retain its notices and any bundled component licenses |
+| Python `pyserial` 3.5 | Package metadata: BSD; retain the license and notices from the distribution used |
 
-De exacte LILYGO-bron is commit `3deece89098f25e7d155e41e4e0f5dd8b368ab02`. Zie [prepare_firmware.py](scripts/prepare_firmware.py) en [platformio.ini](firmware/platformio.ini) voor de selectie en vaste versies. Build- en ontwikkeltools hebben daarnaast hun eigen licenties; ze worden hiermee niet opnieuw gelicentieerd.
+The exact LILYGO source is commit `3deece89098f25e7d155e41e4e0f5dd8b368ab02`. See [prepare_firmware.py](scripts/prepare_firmware.py) and [platformio.ini](firmware/platformio.ini) for the selection and pinned versions. Build and development tools also have their own licenses; they are not relicensed here.
 
-Voor publieke firmwaredistributie moeten volledige toepasselijke notices, corresponderende broncode, buildinformatie en waar van toepassing installatie-informatie beschikbaar zijn. De lijst hierboven vervangt die leveringsplicht niet. De concrete open punten staan in [open-source-readiness](docs/open-source-readiness.md).
+Public firmware distribution requires the full applicable notices, corresponding source, build information and, where applicable, installation information. This list does not replace those delivery obligations. The specific outstanding items are in [publication readiness](docs/open-source-readiness.md).
