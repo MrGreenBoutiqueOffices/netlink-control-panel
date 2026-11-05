@@ -1,4 +1,6 @@
-# Firmware bijwerken via wifi
+# Firmware bijwerken via wifi — huidige host-benchroute
+
+Dit document beschrijft de bestaande hostgestuurde benchroute. Het [besluit voor #15](signed-updates.md#besluit-het-paneel-beheert-zijn-updates) is zelfstandig downloaden en installeren vanaf het paneel, met lokale bootbevestiging. De webserver valt buiten die updatescope. Dat werkt nog niet in de huidige firmware: onderstaande procedure vereist een gekoppelde host, inclusief `ota_confirm` na reboot.
 
 Zie [de full-image-diagnose van issue #14](ota-full-image.md) voor de voortgangsafhankelijke hostfix en de nog open fysieke matrix.
 

@@ -1,6 +1,6 @@
 # Ondertekende updates — eerste deel van #15
 
-Deze implementatie voegt onafhankelijke releaseautorisatie toe aan de bestaande wifi-bench-OTA. Host en paneel controleren dezelfde ECDSA P-256/SHA-256-handtekening. Dit is nog geen beheerde updater in `netlink-webserver`: de productieprotocol-/USB-route, persistente pogingadministratie, idle-/actieblokkering en reconciliatie na een containerrestart blijven binnen #15 open. Fysieke full-image-OTA-acceptatie blijft #14.
+Deze implementatie voegt onafhankelijke releaseautorisatie toe aan de bestaande wifi-bench-OTA. Host en paneel controleren dezelfde ECDSA P-256/SHA-256-handtekening. Zelfstandig downloaden en installeren via wifi is het doel van #15; dat is nog niet geïmplementeerd. De huidige bench-route vereist een host voor aanlevering en bootbevestiging. De paneeleigen update-lifecycle, downloadclient, lokale bediening, persistente pogingadministratie en opstartbevestiging zonder host blijven open. Fysieke full-image-OTA-acceptatie blijft #14.
 
 ## Trust en build
 
@@ -53,7 +53,33 @@ uv run panel wifi update --release-bundle <downloaded-assets> --trusted-keys <pi
 
 De publieke policy moet vooraf vertrouwd zijn; haal hem niet zonder onafhankelijke controle uit dezelfde download als de firmware. Alle vereiste assets moeten aanwezig zijn. Een paneel moet signed-required en dezelfde boardrevision melden. Het hostprototype valt niet terug op de oude unsigned start wanneer signed preflight of de paneelcontrole faalt. Bestaande pairing/TLS-authenticatie blijft daarnaast nodig.
 
-Dit is een bench-CLI. Het is niet de toekomstige update-eigenaar naast de webserver. De webserver moet dezelfde verifier en één transportonafhankelijke lifecycle integreren; hij moet zijn eventloop vrijhouden en na restart een bestaande poging reconciliëren.
+Dit is de huidige bench-CLI; deze levert de bytes aan en bevestigt de boot. Het paneel kan met deze implementatie nog niet zelfstandig een release downloaden of zonder host een kandidaatboot bevestigen. De toekomstige verantwoordelijkheid staat hieronder.
+
+## Besluit: het paneel beheert zijn updates
+
+Besloten op 2026-11-05: het paneel moet via wifi zelfstandig een ondertekende release kunnen ophalen, installeren en beoordelen. Alleen voeding, geconfigureerde wifi en bereik tot de updatebron zijn daarvoor nodig. Een Mac, NetLink, gekoppelde bedieningssessie of draaiende webserver is geen voorwaarde. Wifi blijft optioneel voor normale USB-bediening; zelfstandig draadloos updaten vereist wel wifi. USB blijft beschikbaar voor installatie en herstel. Webserverintegratie, centrale uitrolaansturing en routine-updates met aanlevering door een host vallen buiten #15. De webserver houdt zijn bestaande rol in bureau- en monitorbediening.
+
+| Onderdeel | Verantwoordelijkheid in het doelontwerp |
+| --- | --- |
+| Paneelfirmware | Eén update-toestandsmachine, toelating/idle, releaseverificatie, wifi-download, slotkeuze, voortgang/uitkomst, kandidaatboot, lokale self-check, VALID en rollback |
+| Releaseworkflow | Dezelfde ondertekende manifests, autorisatie en firmware-assets produceren; nooit rechtstreeks een paneel flashen |
+
+De eerste zelfstandige gebruikersroute is op het paneel: controleren op een update, versie/status tonen en installatie expliciet starten. Automatisch controleren of uitrollen is afzonderlijk beleid en wordt hiermee niet standaard aangezet. De huidige pairing is voor de host-benchroute; de toekomstige zelfstandige download mag geen gekoppelde host vereisen.
+
+De downloadclient haalt eerst het begrensde manifest en de autorisatie op, verifieert de onafhankelijke releasehandtekening tegen de reeds ingebouwde publieke trust en controleert boardrevision, versie, protocol, layout, lengte en counter vóór flash wordt gewist of geschreven. De firmwarestream wordt begrensd en gehasht vóór activatie. HTTPS moet de serveridentiteit valideren; redirects, retrybudget, tijdslimieten en maximale downloadgrootte moeten begrensd zijn. Uitval van de bron mag geen unsigned fallback of onbeperkte herstartlus veroorzaken. De concrete bron, kanaalkeuze en eventuele toegangsverlening moeten nog worden uitgewerkt. Een private GitHub-repository maakt assets niet vanzelf bereikbaar voor een paneel; er wordt geen langlevend GitHub-token in firmware ingebouwd en een publieke mirror wordt niet impliciet ingericht. De gepubliceerde assets blijven de bron voor de distributie.
+
+Het paneel bewaakt één actieve updatepoging, vereist idle bediening en blokkeert conflicterende acties tot afronding of veilig afbreken. Een tweede updateverzoek krijgt een busy-resultaat en kan een lopende poging niet overnemen. Dit toelatingsbeleid wordt lokaal afgedwongen.
+
+Het paneel bewaart pogingidentiteit, geautoriseerde verwachte image, fase en uitkomst persistent. Na stroomverlies of een paneelrestart wordt de echte slot-/bootstatus vergeleken met die poging vóór een nieuwe poging wordt toegelaten. Een bestaand flashhandle overleeft geen reboot: hervatten of gecontroleerd opnieuw beginnen van het inactieve slot moet expliciet worden geïmplementeerd en getest. Bestaande instellingen en de laatst werkende image moeten behouden blijven.
+
+Een nieuwe boot controleert lokaal de verwachte image en opstartgezondheid en bevestigt vervolgens zelf expliciet VALID. Een Mac, nieuwe hosthandshake of werkende webserver mag niet nodig zijn om een gezonde kandidaat te behouden. Lokale self-checks en netwerkbereikbaarheid zijn afzonderlijke signalen. Bij ongeldige image, self-checkfout of verlopen bevestigingstermijn blijft rollback gelden. De huidige hostgestuurde `ota_confirm`-route moet hiervoor nog worden aangepast; de signingbasis uit PR #32 levert dit gedrag niet. Het paneel toont de opgeslagen uitkomst lokaal. Voor latere normale bediening geldt de bestaande handshake; die bevestigt geen update.
+
+## Resterende acceptatie van #15
+
+- Zelfstandige wifi-proef met alleen voeding en zonder Mac, NetLink of webserver: vanaf het paneel controleren, downloaden, installeren, herstarten, lokaal VALID bevestigen en resultaat tonen.
+- Bij zelfstandige downloads gelden de ingebouwde verificatie- en installatiepolicy; ongeldige handtekening, verkeerde hardware/protocol en conflicterende pogingen worden geweigerd.
+- Netwerkonderbreking, bronuitval, stroomverlies, paneelrestart, self-checkfout leveren een begrensde, zichtbare uitkomst op; rollback en instellingenbehoud zijn fysiek aangetoond.
+- Productietrust, bekende boardrevision, sleutelbeheer en bereikbare distributiebron zijn gecontroleerd ingericht. #14 blijft de fysieke full-image-/herstelgate; #9 is geen afhankelijkheid van deze updatefunctie.
 
 ## Rotatie en beperkingen
 
@@ -65,4 +91,4 @@ Rollback kan een oudere keypolicy herstellen. Dit mechanisme levert geen permane
 
 De tests gebruiken uitsluitend tijdelijke sleutels. Python-signatures worden met de echte, vastgepinde mbedTLS 2.28.4-bron uit het gebruikte SDK native geverifieerd; de daadwerkelijke `PanelOta`-handler draait met fake SDK-flashcalls. Tests controleren afwijzing vóór flash, geen unsigned bypass, ingetrokken keys, gewijzigde autorisatie, verkeerd board/protocol/layout/counter, formaatgrenzen, artifactmutatie en hervatten met uitsluitend dezelfde autorisatie. `scripts/prepare_crypto_tests.py` haalt de exacte bron met SHA-256-controle op en bouwt alleen de native testbibliotheek; productie gebruikt de PlatformIO/ESP-IDF-bibliotheek.
 
-Compile- en native tests bewijzen nog geen cryptotiming/heapmarge op het display, USB/wifi-productielifecycle of fysieke herstelbaarheid. Er is voor deze wijziging geen paneel geflasht of productiekey aangemaakt, geïnstalleerd of gelezen. Zie [onderzoeksbronnen](signed-update-research.md) en [releaseprocedure](releases.md).
+Compile- en native tests bewijzen nog geen cryptotiming/heapmarge op het display, de zelfstandige wifi-lifecycle of fysieke herstelbaarheid. Er is voor deze wijziging geen paneel geflasht of productiekey aangemaakt, geïnstalleerd of gelezen. Zie [onderzoeksbronnen](signed-update-research.md) en [releaseprocedure](releases.md).
