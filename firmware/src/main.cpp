@@ -15,7 +15,8 @@
 #include "production_protocol.h"
 #include <mbedtls/base64.h>
 
-PanelOta ota;
+#include "generated_update_trust.h"
+PanelOta ota(compiledUpdatePolicy(), PANEL_UPDATE_IDENTITY);
 PanelDemo demo;
 ProductionSession production;
 char bootId[17];
@@ -176,7 +177,7 @@ void receive(Transport source, const char *line) {
       }
     } else if (!linked || source != active) return;
     StaticJsonDocument<1536> response;
-    StaticJsonDocument<384> boot;ota.describe(boot.to<JsonObject>());
+    StaticJsonDocument<512> boot;ota.describe(boot.to<JsonObject>());
     bool accepted = production.handle(message,response,millis(),panelId,PANEL_FIRMWARE_VERSION,bootId,startupHealthy(),boot["state"] | "unknown");
     if(accepted && !strcmp(kind,"hello"))response["capabilities"].add("panel.config.status.v1");
     if(accepted && !strcmp(kind,"state.get"))describeSettings(response["state"]["panel_config"].to<JsonObject>());

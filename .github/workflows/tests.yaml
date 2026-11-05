@@ -37,6 +37,8 @@ jobs:
         run: uv sync --locked
       - name: 🏗 Prepare firmware dependencies
         run: uv run --locked python scripts/prepare_firmware.py
+      - name: 🏗 Prepare native signature tests
+        run: uv run --locked python scripts/prepare_crypto_tests.py
       - name: 🏗 Build firmware
         run: uv run --locked pio run --project-dir firmware
       - name: 🚀 Run host and native firmware tests

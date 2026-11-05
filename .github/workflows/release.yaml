@@ -47,7 +47,11 @@ jobs:
           echo "PANEL_RELEASE_VERSION=$version" >> "$GITHUB_ENV"
       - name: 🏗 Prepare firmware dependencies
         run: uv run --locked python scripts/prepare_firmware.py
+      - name: 🏗 Prepare native signature tests
+        run: uv run --locked python scripts/prepare_crypto_tests.py
       - name: 🏗 Build firmware
+        env:
+          PANEL_BOARD_REVISION: ${{ vars.PANEL_BOARD_REVISION || 'unverified' }}
         run: uv run --locked pio run --project-dir firmware
       - name: 🚀 Run host and native firmware tests
         run: uv run --locked python scripts/check_tests.py
@@ -55,10 +59,21 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           RELEASE_BODY: ${{ github.event.release.body }}
+          PANEL_BOARD_REVISION: ${{ vars.PANEL_BOARD_REVISION || 'unverified' }}
         run: |
           mkdir -p artifacts
           uv run --locked python -c 'import os; from pathlib import Path; Path("artifacts/release-notes.md").write_text(os.environ["RELEASE_BODY"], encoding="utf-8")'
           uv run --locked python scripts/release_artifacts.py --tag "$RELEASE_TAG" --notes artifacts/release-notes.md --output artifacts/release
+      - name: 🔐 Sign configured release
+        env:
+          PANEL_RELEASE_SIGNING_KEY: ${{ secrets.PANEL_RELEASE_SIGNING_KEY }}
+          RELEASE_COUNTER: ${{ github.event.release.id }}
+        run: |
+          if [ -n "$PANEL_RELEASE_SIGNING_KEY" ]; then
+            uv run --locked python scripts/sign_release.py --bundle artifacts/release --counter "$RELEASE_COUNTER"
+          else
+            uv run --locked python -c 'from netlink_panel.signed_updates import load_trust; assert load_trust("release/update-trust.json")["mode"] == "bench", "Signed policy requires a release signing key"'
+          fi
       - name: 🚀 Verify release asset checksums
         working-directory: artifacts/release
         run: sha256sum --check SHA256SUMS

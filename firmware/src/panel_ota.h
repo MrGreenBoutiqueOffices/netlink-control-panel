@@ -5,12 +5,14 @@
 #include <esp_timer.h>
 #include <mbedtls/sha256.h>
 #include "ota_policy.h"
+#include "signed_update.h"
 
 #include "panel_version.h"
 #define PANEL_OTA_PROFILE "lilygo-s3-long-cst3530:p1:ota3m-v1"
 
 class PanelOta {
  public:
+  explicit PanelOta(UpdatePolicy policy, const char *identity = "bench") : policy(policy), buildIdentity(identity) {}
   void bootStart();
   void describe(JsonObject result);
   void handle(JsonDocument &message, JsonDocument &response, bool healthy);
@@ -21,6 +23,11 @@ class PanelOta {
   bool committed() const { return rebootAt != 0; }
   int percent() const { return guard.expected ? 100 * guard.offset / guard.expected : 0; }
  private:
+  UpdatePolicy policy;
+  const char *buildIdentity;
+  uint8_t authorizationIdentity[32] = {};
+  bool authorizedTransfer = false;
+  void begin(JsonDocument &message, JsonDocument &response, bool healthy, const UpdateAuthorization *authorization);
   bool anchorRunning();
   void fail(JsonDocument &response, const char *reason);
   TransferGuard guard;

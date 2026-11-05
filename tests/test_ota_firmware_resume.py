@@ -58,7 +58,7 @@ PROGRAM = r"""
 #include <cassert>
 unsigned begins=0,writes=0,aborts=0,clockMs=100;
 int main() {
-  PanelOta ota; ota.bootStart();
+  PanelOta ota(benchUpdatePolicy()); ota.bootStart();
   StaticJsonDocument<1536> m; StaticJsonDocument<512> r;
   auto begin=[&]() { m.clear(); m["type"]="ota_begin";m["id"]=1;m["size"]=1024;m["sha256"]=std::string(64, 'a');m["image_sha256"]=std::string(64,'b');m["profile"]=PANEL_OTA_PROFILE;m["version"]="0.3.2";r.clear();ota.handle(m,r,true); };
   auto chunk=[&](int offset) { m.clear();m["type"]="ota_chunk";m["id"]=2;m["offset"]=offset;m["data"]="fixture";r.clear();ota.handle(m,r,true); };
@@ -116,6 +116,10 @@ class FirmwareResumeTests(unittest.TestCase):
                     str(library),
                     str(source),
                     str(root / "firmware/src/panel_ota.cpp"),
+                    str(root / "firmware/src/signed_update.cpp"),
+                    "-I",
+                    str(root / "firmware/.vendor/mbedtls/include"),
+                    str(root / "firmware/.vendor/mbedtls/build/library/libmbedcrypto.a"),
                     "-o",
                     str(binary),
                 ],

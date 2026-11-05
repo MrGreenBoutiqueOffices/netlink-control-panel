@@ -3,7 +3,10 @@ name = "netlink-panel"
 version = "0.8.0"
 description = "USB and authenticated Wi-Fi bench prototype for the NetLink LILYGO control panel"
 requires-python = ">=3.11"
-dependencies = ["pyserial==3.5"]
+dependencies = [
+    "cryptography==50.0.2",
+    "pyserial==3.5",
+]
 
 [dependency-groups]
 dev = [
