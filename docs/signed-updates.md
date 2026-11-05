@@ -57,31 +57,29 @@ Dit is de huidige bench-CLI; deze levert de bytes aan en bevestigt de boot. Het 
 
 ## Besluit: het paneel beheert zijn updates
 
-Besloten op 2026-11-05: het paneel moet via wifi zelfstandig een ondertekende release kunnen ophalen, installeren en beoordelen. Alleen voeding, geconfigureerde wifi en bereik tot de updatebron zijn daarvoor nodig. Een Mac, NetLink, gekoppelde bedieningssessie of draaiende webserver is geen voorwaarde. Wifi blijft optioneel voor normale USB-bediening; zonder wifi levert een optionele host de firmwarebytes aan.
+Besloten op 2026-11-05: het paneel moet via wifi zelfstandig een ondertekende release kunnen ophalen, installeren en beoordelen. Alleen voeding, geconfigureerde wifi en bereik tot de updatebron zijn daarvoor nodig. Een Mac, NetLink, gekoppelde bedieningssessie of draaiende webserver is geen voorwaarde. Wifi blijft optioneel voor normale USB-bediening; zelfstandig draadloos updaten vereist wel wifi. USB blijft beschikbaar voor installatie en herstel. Webserverintegratie, centrale uitrolaansturing en routine-updates met aanlevering door een host vallen buiten #15. De webserver houdt zijn bestaande rol in bureau- en monitorbediening.
 
 | Onderdeel | Verantwoordelijkheid in het doelontwerp |
 | --- | --- |
-| Paneelfirmware | Eén update-toestandsmachine, toelating/idle, releaseverificatie, download of ontvangst, slotkeuze, voortgang/uitkomst, kandidaatboot, lokale self-check, VALID en rollback |
-| Bestaande webserver | Optioneel starten, status tonen en bytes via USB/wifi aanleveren; geen verplichte eigenaar van de updatepoging |
-| Centrale aansturing | Optioneel gewenst versienummer en uitrolmoment aanbieden binnen het lokale toelatingsbeleid |
+| Paneelfirmware | Eén update-toestandsmachine, toelating/idle, releaseverificatie, wifi-download, slotkeuze, voortgang/uitkomst, kandidaatboot, lokale self-check, VALID en rollback |
 | Releaseworkflow | Dezelfde ondertekende manifests, autorisatie en firmware-assets produceren; nooit rechtstreeks een paneel flashen |
 
 De eerste zelfstandige gebruikersroute is op het paneel: controleren op een update, versie/status tonen en installatie expliciet starten. Automatisch controleren of uitrollen is afzonderlijk beleid en wordt hiermee niet standaard aangezet. De huidige pairing is voor de host-benchroute; de toekomstige zelfstandige download mag geen gekoppelde host vereisen.
 
 De downloadclient haalt eerst het begrensde manifest en de autorisatie op, verifieert de onafhankelijke releasehandtekening tegen de reeds ingebouwde publieke trust en controleert boardrevision, versie, protocol, layout, lengte en counter vóór flash wordt gewist of geschreven. De firmwarestream wordt begrensd en gehasht vóór activatie. HTTPS moet de serveridentiteit valideren; redirects, retrybudget, tijdslimieten en maximale downloadgrootte moeten begrensd zijn. Uitval van de bron mag geen unsigned fallback of onbeperkte herstartlus veroorzaken. De concrete bron, kanaalkeuze en eventuele toegangsverlening moeten nog worden uitgewerkt. Een private GitHub-repository maakt assets niet vanzelf bereikbaar voor een paneel; er wordt geen langlevend GitHub-token in firmware ingebouwd en een publieke mirror wordt niet impliciet ingericht. De gepubliceerde assets blijven de bron voor de distributie.
 
-Dezelfde lokale toestandsmachine ontvangt bytes van een optionele USB-/wifi-host. Het paneel bewaakt één actieve poging, vereist idle bediening en blokkeert conflicterende acties tot afronding of veilig afbreken. Een tweede bron krijgt een busy-resultaat en kan een lopende poging niet overnemen. De webserver moet tijdens optionele aanlevering zijn eventloop vrijhouden, maar zijn beschikbaarheid bepaalt niet de lokale update-uitkomst.
+Het paneel bewaakt één actieve updatepoging, vereist idle bediening en blokkeert conflicterende acties tot afronding of veilig afbreken. Een tweede updateverzoek krijgt een busy-resultaat en kan een lopende poging niet overnemen. Dit toelatingsbeleid wordt lokaal afgedwongen.
 
 Het paneel bewaart pogingidentiteit, geautoriseerde verwachte image, fase en uitkomst persistent. Na stroomverlies of een paneelrestart wordt de echte slot-/bootstatus vergeleken met die poging vóór een nieuwe poging wordt toegelaten. Een bestaand flashhandle overleeft geen reboot: hervatten of gecontroleerd opnieuw beginnen van het inactieve slot moet expliciet worden geïmplementeerd en getest. Bestaande instellingen en de laatst werkende image moeten behouden blijven.
 
-Een nieuwe boot controleert lokaal de verwachte image en opstartgezondheid en bevestigt vervolgens zelf expliciet VALID. Een Mac, nieuwe hosthandshake of werkende webserver mag niet nodig zijn om een gezonde kandidaat te behouden. Lokale self-checks en netwerkbereikbaarheid zijn afzonderlijke signalen. Bij ongeldige image, self-checkfout of verlopen bevestigingstermijn blijft rollback gelden. De huidige hostgestuurde `ota_confirm`-route moet hiervoor nog worden aangepast; de signingbasis uit PR #32 levert dit gedrag niet. Een later verbonden host leest de opgeslagen uitkomst en maakt een verse handshake voor bediening, zonder de afgeronde installatie nog te hoeven bevestigen.
+Een nieuwe boot controleert lokaal de verwachte image en opstartgezondheid en bevestigt vervolgens zelf expliciet VALID. Een Mac, nieuwe hosthandshake of werkende webserver mag niet nodig zijn om een gezonde kandidaat te behouden. Lokale self-checks en netwerkbereikbaarheid zijn afzonderlijke signalen. Bij ongeldige image, self-checkfout of verlopen bevestigingstermijn blijft rollback gelden. De huidige hostgestuurde `ota_confirm`-route moet hiervoor nog worden aangepast; de signingbasis uit PR #32 levert dit gedrag niet. Het paneel toont de opgeslagen uitkomst lokaal. Voor latere normale bediening geldt de bestaande handshake; die bevestigt geen update.
 
 ## Resterende acceptatie van #15
 
 - Zelfstandige wifi-proef met alleen voeding en zonder Mac, NetLink of webserver: vanaf het paneel controleren, downloaden, installeren, herstarten, lokaal VALID bevestigen en resultaat tonen.
-- Dezelfde verificatie en installatiepolicy bij zelfstandige downloads en optionele hostaanlevering; ongeldige handtekening, verkeerde hardware/protocol en conflicterende pogingen worden geweigerd.
-- Netwerkonderbreking, bronuitval, stroomverlies, paneelrestart, self-checkfout en ontbrekende webserver leveren een begrensde, zichtbare uitkomst op; rollback en instellingenbehoud zijn fysiek aangetoond.
-- Productietrust, bekende boardrevision, sleutelbeheer en bereikbare distributiebron zijn gecontroleerd ingericht. #14 blijft de fysieke full-image-/herstelgate; #9 is alleen relevant voor de optionele webserver-/USB-integratie.
+- Bij zelfstandige downloads gelden de ingebouwde verificatie- en installatiepolicy; ongeldige handtekening, verkeerde hardware/protocol en conflicterende pogingen worden geweigerd.
+- Netwerkonderbreking, bronuitval, stroomverlies, paneelrestart, self-checkfout leveren een begrensde, zichtbare uitkomst op; rollback en instellingenbehoud zijn fysiek aangetoond.
+- Productietrust, bekende boardrevision, sleutelbeheer en bereikbare distributiebron zijn gecontroleerd ingericht. #14 blijft de fysieke full-image-/herstelgate; #9 is geen afhankelijkheid van deze updatefunctie.
 
 ## Rotatie en beperkingen
 
@@ -93,4 +91,4 @@ Rollback kan een oudere keypolicy herstellen. Dit mechanisme levert geen permane
 
 De tests gebruiken uitsluitend tijdelijke sleutels. Python-signatures worden met de echte, vastgepinde mbedTLS 2.28.4-bron uit het gebruikte SDK native geverifieerd; de daadwerkelijke `PanelOta`-handler draait met fake SDK-flashcalls. Tests controleren afwijzing vóór flash, geen unsigned bypass, ingetrokken keys, gewijzigde autorisatie, verkeerd board/protocol/layout/counter, formaatgrenzen, artifactmutatie en hervatten met uitsluitend dezelfde autorisatie. `scripts/prepare_crypto_tests.py` haalt de exacte bron met SHA-256-controle op en bouwt alleen de native testbibliotheek; productie gebruikt de PlatformIO/ESP-IDF-bibliotheek.
 
-Compile- en native tests bewijzen nog geen cryptotiming/heapmarge op het display, de zelfstandige wifi-lifecycle, optionele USB-hostroute of fysieke herstelbaarheid. Er is voor deze wijziging geen paneel geflasht of productiekey aangemaakt, geïnstalleerd of gelezen. Zie [onderzoeksbronnen](signed-update-research.md) en [releaseprocedure](releases.md).
+Compile- en native tests bewijzen nog geen cryptotiming/heapmarge op het display, de zelfstandige wifi-lifecycle of fysieke herstelbaarheid. Er is voor deze wijziging geen paneel geflasht of productiekey aangemaakt, geïnstalleerd of gelezen. Zie [onderzoeksbronnen](signed-update-research.md) en [releaseprocedure](releases.md).

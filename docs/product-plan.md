@@ -1,6 +1,6 @@
 # NetLink control panel: USB with optional Wi-Fi
 
-Current decision, 2026-11-05: the panel will own its update lifecycle and download signed firmware independently over Wi-Fi. The existing webserver is an optional control/transport adapter. See [the current update design](signed-updates.md#besluit-het-paneel-beheert-zijn-updates). The proposal below is historical; its panel-service and host-owned update assumptions are superseded. Autonomous download and local boot confirmation are not implemented yet.
+Current decision, 2026-11-05: the panel will own its update lifecycle and download signed firmware independently over Wi-Fi. Webserver update integration and host-fed routine updates are outside issue #15; USB remains available for installation and recovery. See [the current update design](signed-updates.md#besluit-het-paneel-beheert-zijn-updates). The proposal below is historical; its panel-service and host-owned update assumptions are superseded. Autonomous download and local boot confirmation are not implemented yet.
 
 Status: proposal, 2026-10-24. No panel firmware, USB service, deployment, or physical acceptance is delivered by this document.
 
