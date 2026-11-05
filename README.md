@@ -1,6 +1,6 @@
 # NetLink Panel
 
-Een werkprototype voor de LILYGO T-Display S3 Long: een compact bedienpaneel voor bureau en monitor. De directe USB-koppeling met een NetLink wordt de standaard; wifi blijft optioneel. Beheer en updates op afstand zijn onderdeel van het vervolgwerk.
+Een werkprototype voor de LILYGO T-Display S3 Long: een compact bedienpaneel voor bureau en monitor. De directe USB-koppeling met een NetLink wordt de standaard; wifi blijft optioneel. Zelfstandig ondertekend updaten via wifi wordt onderdeel van de firmware; de webserver blijft daarbij optioneel. Dit is vervolgwerk en werkt nog niet in de huidige build.
 
 ## Actuele stand — 4 november 2026
 
@@ -81,7 +81,7 @@ Identificeer het bedoelde paneel via USB-identiteit én handshake. Poortnamen ku
 
 Voor het huidige prototype is alleen de applicatie in het vooraf gecontroleerde actieve slot geschreven. Controleer vóór schrijven apparaatidentiteit, fabrieksbackup, imageprofiel en bootselectie. Gebruik niet blind een volledig upload-/erasecommando: bootloader, partities en NVS behoren niet tot een gewone applicatie-update. De private backup, pairing en installatierapporten staan buiten Git.
 
-USB-flashing is nu de gekozen installatie-/herstelroute. Een beheerde USB-app-update via de toekomstige NetLink panel-service moet nog worden gebouwd. Een merge of build installeert niets op het display.
+USB-flashing is nu de gekozen installatie-/herstelroute. Applicatie-updates via de optionele USB-aanlevering vanuit de bestaande webserver moeten nog worden gebouwd. Het paneel wordt eigenaar van de installatie en bootbevestiging; er komt geen aparte panel-service. Een merge of build installeert niets op het display.
 
 ## Optionele wifi en OTA
 
@@ -96,7 +96,7 @@ Netwerknaam en wachtwoord worden interactief gevraagd. De firmware bewaart confi
 
 De bestaande `uv run panel wifi update` schrijft naar het inactieve applicatieslot en controleert na reboot de image en bootbevestiging. Hervatten na verbindingsverlies en rollback zijn fysiek aangetoond bij eerdere firmware. De grotere 0.4.1-overdracht bereikte echter het reconnectbudget rond 95%. De [full-image-hostfix](docs/ota-full-image.md) herstelt nu op basis van bevestigde voortgang en heeft TLS-foutinjectietests; fysieke acceptatie van de grotere image blijft open. Gebruik voorlopig USB voor installatie van de huidige demoimage. Zie [OTA-procedure](docs/ota.md) en de [actuele displayteststatus](docs/display-demo.md).
 
-De [eerste ondertekeningslaag](docs/signed-updates.md) controleert releasehandtekeningen op host en paneel; de standaardbuild blijft unsigned bench. Productiekeyprovisioning, de beheerde webserver-updater, secure boot, herstel bij alle stroom-/netwerkfouten en onbeheerde recovery zijn nog niet geaccepteerd. Wifi naar een echte NetLink, transportwissel en beheer zonder Mac zijn vervolgwerk.
+De [eerste ondertekeningslaag](docs/signed-updates.md) controleert releasehandtekeningen op host en paneel; de standaardbuild blijft unsigned bench. Zelfstandig downloaden via wifi en lokaal de boot bevestigen staan gepland in [#15](https://github.com/MrGreenBoutiqueOffices/netlink-control-panel/issues/15); daarvoor is de webserver optioneel. Productiekeyprovisioning, secure boot, herstel bij alle stroom-/netwerkfouten en onbeheerde recovery zijn nog niet geaccepteerd. Wifi naar een echte NetLink, transportwissel en beheer zonder Mac zijn vervolgwerk.
 
 ## Vervolgwerk
 
