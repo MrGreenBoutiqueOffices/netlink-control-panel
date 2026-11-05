@@ -9,6 +9,7 @@
 #include "hyn_core.h"
 #include "session_policy.h"
 #include "panel_ota.h"
+#include "panel_updater.h"
 #include "frame_writer.h"
 #include "session_timeout.h"
 #include "panel_demo.h"
@@ -17,6 +18,7 @@
 
 #include "generated_update_trust.h"
 PanelOta ota(compiledUpdatePolicy(), PANEL_UPDATE_IDENTITY);
+PanelUpdater updater(ota,compiledUpdatePolicy().signedOnly && compiledUpdatePolicy().keyCount && strcmp(compiledUpdatePolicy().boardRevision,"unverified"));
 PanelDemo demo;
 ProductionSession production;
 char bootId[17];
@@ -55,7 +57,7 @@ WiFiClientSecure wifiClient;
 IPAddress serverAddress;
 String wifiSSID, wifiPassword, wifiKey;
 uint16_t serverPort = 8769;
-bool wifiEnabled = false, applyWifiPending = false;
+bool wifiEnabled = false, wifiControlEnabled = false, applyWifiPending = false;
 uint32_t lastWifiRetry = 0, lastTLSRetry = 0;
 volatile uint16_t lastWifiDisconnectReason = 0;
 int lastRenderedOtaPercent = -1;
@@ -79,7 +81,7 @@ bool startupHealthy() {
 
 void render();
 void releaseSession(bool preserveTransfer = false) {
-  if (!preserveTransfer) ota.abort();
+  if (!preserveTransfer && !updater.busy()) ota.abort();
   linked = false;
   production.clear();
   if(demo.readOnly)demo.setDeviceState(PanelDeviceState{});
@@ -108,7 +110,7 @@ void ack(Transport source, int id, bool ok) {
 void render() {
   if (!screenReady) return;
   demo.draw(canvas.getFramebuffer());
-  if (ota.receiving() || ota.pending() || ota.committed()) {
+  if (!updater.busy() && (ota.receiving() || ota.pending() || ota.committed())) {
     demo.drawStatus(canvas.getFramebuffer(), ota.committed()?PanelDemo::Updated:PanelDemo::Updating, ota.receiving()?ota.percent():100, ota.pending());
   }
   // AXS15231B has no hardware axis swap. Flush a complete native frame.
@@ -120,9 +122,13 @@ void render() {
 }
 
 bool validWifi(JsonDocument &config) {
-  for (const char *field : {"ssid", "password", "host", "key"})
+  for (const char *field : {"ssid", "password"})
     if (!config[field].is<const char *>()) return false;
-  size_t s = strlen(config["ssid"]), p = strlen(config["password"]), k = strlen(config["key"]);
+  size_t s = strlen(config["ssid"]), p = strlen(config["password"]);
+  if(s<1 || s>32 || p<8 || p>63)return false;
+  if(!config.containsKey("host") && !config.containsKey("key") && !config.containsKey("port"))return true;
+  if(!config["host"].is<const char *>() || !config["key"].is<const char *>())return false;
+  size_t k=strlen(config["key"]);
   IPAddress address;
   if (s < 1 || s > 32 || p < 8 || p > 63 || k != 64 || !address.fromString(config["host"].as<const char *>())) return false;
   if (address[0] == 0 || address[0] == 127 || address[0] >= 224) return false;
@@ -135,10 +141,12 @@ void loadWifi() {
   StaticJsonDocument<1536> config;
   String stored = preferences.getString("config", "");
   wifiEnabled = !deserializeJson(config, stored) && validWifi(config);
+  wifiControlEnabled=wifiEnabled && config.containsKey("host");
   if (!wifiEnabled) return;
   wifiSSID = config["ssid"].as<String>(); wifiPassword = config["password"].as<String>();
-  wifiKey = config["key"].as<String>(); serverAddress.fromString(config["host"].as<const char *>());
-  serverPort = config["port"].as<int>();
+  if(wifiControlEnabled) {
+    wifiKey = config["key"].as<String>();serverAddress.fromString(config["host"].as<const char *>());serverPort=config["port"].as<int>();
+  } else wifiKey="";
 }
 
 void applyWifi() {
@@ -152,7 +160,7 @@ void applyWifi() {
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
     WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
-    wifiClient.setPreSharedKey(panelId, wifiKey.c_str());
+    if(wifiControlEnabled)wifiClient.setPreSharedKey(panelId, wifiKey.c_str());
     wifiClient.setHandshakeTimeout(1);
     lastWifiRetry = millis();
     lastTLSRetry = millis() - 5000;
@@ -165,6 +173,9 @@ void receive(Transport source, const char *line) {
   if (deserializeJson(message, line)) return;
   if (message["v"].is<int>() && message["v"].as<int>() == 2) {
     const char *kind = message["type"] | "";
+    if(updater.busy() && strcmp(kind,"heartbeat")) {
+      StaticJsonDocument<256> error;error["v"]=2;error["session"]=message["session"];error["type"]="error";error["id"]=message["id"];error["code"]="busy";sendTo(source,error);return;
+    }
     if (!strcmp(kind, "heartbeat")) {
       if (linked && source == active && production.matches(message)) lastHost = millis();
       return;
@@ -194,7 +205,7 @@ void receive(Transport source, const char *line) {
   }
   if (!message["id"].is<int>() || message["id"].as<int>() <= 0) return;
   int id = message["id"];
-  if (ota.committed()) { ack(source, id, false); return; }
+  if (updater.busy() || ota.committed()) { ack(source, id, false); return; }
   if (!strcmp(type, "hello")) {
     if (!canHandshake(active, source)) { ack(source, id, false); return; }
     if (source == Transport::USB && (active == Transport::Wifi || ota.receiving())) releaseSession();
@@ -205,6 +216,7 @@ void receive(Transport source, const char *line) {
     response["display_ready"] = screenReady;
     response["transport"] = source == Transport::USB ? "usb" : "wifi";
     JsonArray capabilities = response["capabilities"].to<JsonArray>();
+    capabilities.add("github_updates_v1");capabilities.add("wifi_only_provision_v1");
     capabilities.add("demo_state"); capabilities.add("wifi_provision"); capabilities.add("tls_psk");
     capabilities.add("ota_v1"); capabilities.add("ota_resume_v1"); capabilities.add("demo_ui_v1"); capabilities.add("frame_snapshot_v1");
     response["self_test_ok"] = startupHealthy();
@@ -326,6 +338,7 @@ void setup() {
   settingsStorage.ready=settingsStorage.nvs.begin("panel-ui",false);
   settings.load();demo.applySettings(settings.applied);
   ota.bootStart();
+  updater.begin();
   pinMode(1, OUTPUT); digitalWrite(1, LOW);
   nativePixels = static_cast<uint16_t *>(ps_malloc(WIDTH * HEIGHT * sizeof(uint16_t)));
   screenReady = nativePixels && canvas.begin() && display.begin(32000000);
@@ -334,12 +347,21 @@ void setup() {
   digitalWrite(1, HIGH);
   if (preferences.begin("panel-wifi", false)) applyWifi();
   demo.scene(0,millis());
+  if(strcmp(updater.status(),"Controleer op nieuwe firmware"))demo.screen=PanelDemo::Updates;
   demo.applySettings(settings.applied);
   render();
 }
 
 void loop() {
   ota.tick();
+  updater.tick(startupHealthy(),wifiEnabled && WiFi.status()==WL_CONNECTED);
+  if(demo.updateAction!=PanelDemo::NoUpdateAction) {
+    PanelDemo::UpdateAction action=demo.updateAction;demo.updateAction=PanelDemo::NoUpdateAction;
+    bool idle=demo.idleForUpdate();bool wifi=wifiEnabled && WiFi.status()==WL_CONNECTED;
+    if(action==PanelDemo::CheckUpdate)updater.check(idle,wifi);
+    else updater.install(idle,wifi,startupHealthy());
+  }
+  demo.updateView(updater.status(),updater.version(),updater.available(),updater.percent());
   if(production.expire(millis()))demo.setDeviceState(production.devices);
   // USB always has priority and can recover/reconfigure a bad Wi-Fi setup.
   readStream(Serial, usbInbox, Transport::USB);
@@ -352,7 +374,7 @@ void loop() {
     if (status != previousWifiStatus) { previousWifiStatus = status; render(); }
     if (status != WL_CONNECTED && now - lastWifiRetry > 15000) { lastWifiRetry = now; WiFi.reconnect(); }
     // Bounded TLS attempts only while no USB or Wi-Fi control session exists.
-    if (status == WL_CONNECTED && active == Transport::None && demo.screen != PanelDemo::Moving && !wifiClient.connected() && now - lastTLSRetry > 5000) {
+    if (!updater.busy() && wifiControlEnabled && status == WL_CONNECTED && active == Transport::None && demo.screen != PanelDemo::Moving && !wifiClient.connected() && now - lastTLSRetry > 5000) {
       lastTLSRetry = now;
       wifiClient.connect(serverAddress, serverPort, 1000);
       wifiInbox = Inbox{};
@@ -371,7 +393,7 @@ void loop() {
     lastTouchPoll = now;
     hyn_ts_data *touch = get_touch_data();
     bool pressed = touch && touch->rp_buf.rep_num > 0;
-    demo.setBusy(ota.receiving() || ota.pending() || ota.committed());
+    demo.setBusy(updater.busy() || ota.receiving() || ota.pending() || ota.committed());
     if (pressed && !hadTouch) {
       int x = touch->rp_buf.pos_info[0].pos_y, y = 179 - touch->rp_buf.pos_info[0].pos_x;
       gestureSettings=demo.settings();
@@ -385,7 +407,7 @@ void loop() {
     if (!pressed && hadTouch) { demo.touchUp(now);persistLocalSettings(); }
     hadTouch = pressed;
   }
-  demo.setBusy(ota.receiving() || ota.pending() || ota.committed());
+  demo.setBusy(updater.busy() || ota.receiving() || ota.pending() || ota.committed());
   if (demo.tick(millis())) render();
   delay(1);
 }

@@ -11,7 +11,7 @@
 #endif
 
 // Arduino's default hook confirms an OTA before setup(). Defer this until the
-// paired host verifies the running hash and the panel's startup self-check.
+// local updater or paired bench host verifies the running hash and startup health.
 extern "C" bool verifyRollbackLater() { return true; }
 
 static const char imageMarker[] = "NETLINK_PANEL_IMAGE_V1|" PANEL_OTA_PROFILE "|v" PANEL_FIRMWARE_VERSION ";";
@@ -39,6 +39,22 @@ static bool decodeBounded(const char *text, uint8_t *out, size_t capacity, size_
     if (length+count>capacity) return false;
     for (size_t j=0;j<count;j++) out[length++]=(value>>(16-8*j))&255;
   }
+  return true;
+}
+
+bool PanelOta::authorize(JsonDocument &envelope, UpdateAuthorization &output) const {
+  uint8_t record[340], signature[72]; size_t length=0, signatureLength=0;
+  return envelope.size()==2 && envelope["authorization"].is<const char *>() && envelope["signature"].is<const char *>() &&
+    decodeBounded(envelope["authorization"],record,sizeof(record),length) &&
+    decodeBounded(envelope["signature"],signature,sizeof(signature),signatureLength) &&
+    verifyUpdate(record,length,signature,signatureLength,policy,output);
+}
+
+bool PanelOta::confirmLocal(const char *expectedImageSha, bool healthy) {
+  if (!supported || !healthy || receiving() || !expectedImageSha || strcmp(expectedImageSha,runningSha)) return false;
+  if (pendingBoot && esp_ota_mark_app_valid_cancel_rollback()!=ESP_OK) return false;
+  pendingBoot=false;
+  if (bootTimer) esp_timer_stop(bootTimer);
   return true;
 }
 

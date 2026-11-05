@@ -100,6 +100,17 @@ int main(int argc,char **argv) {
   d.draw(memory+1);assert(memory[0]==0x1234 && memory[640*180+1]==0x5678);
   d.setDeviceState(PanelDeviceState{});assert(d.readOnly && !d.deviceState.heightKnown && d.height==0);
   d.draw(memory+1);assert(memory[0]==0x1234 && memory[640*180+1]==0x5678);
+  // Updates are reachable with a tap, including in read-only production mode.
+  d=PanelDemo();d.setDeviceState(live);tap(d,420,130,100);tap(d,500,130,300);
+  assert(d.screen==PanelDemo::Updates && d.idleForUpdate());
+  tap(d,200,145,500);assert(d.updateAction==PanelDemo::CheckUpdate);
+  d.updateAction=PanelDemo::NoUpdateAction;tap(d,500,145,700);assert(d.updateAction==PanelDemo::NoUpdateAction);
+  d.updateView("Nieuwe firmware beschikbaar","0.9.0",true,0);
+  tap(d,500,145,900);assert(d.updateAction==PanelDemo::InstallUpdate);
+  d.setBusy(true);d.updateAction=PanelDemo::NoUpdateAction;tap(d,50,90,1100);tap(d,200,145,1300);
+  assert(d.screen==PanelDemo::Updates && d.updateAction==PanelDemo::NoUpdateAction);
+  d.draw(memory+1);assert(memory[0]==0x1234 && memory[640*180+1]==0x5678);
+  d.setBusy(false);tap(d,50,90,1500);assert(d.screen==PanelDemo::Menu);
   delete[] memory;
 }
 """

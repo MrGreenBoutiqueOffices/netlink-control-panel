@@ -61,11 +61,14 @@ bool verifyUpdate(const uint8_t *record, size_t length, const uint8_t *signature
   if (!counter || counter < policy.minimumCounter || !low || low > high || policy.protocol < low || policy.protocol > high ||
       candidate.size < 288 || candidate.size > 0x300000) return false;
   hex(p,candidate.sha256); p+=32; hex(p,candidate.imageSha256); p+=32;
-  p += 52; // Authenticated manifest digest and exact source commit.
+  hex(p,candidate.manifestSha256); p+=32;
+  for (size_t i=0;i<20;i++) sprintf(candidate.commit+2*i,"%02x",p[i]);
+  p+=20; candidate.counter=counter;
   char board[65], revision[33], layout[33];
   if (!identifier(p,end,candidate.version,31) || !identifier(p,end,board,64) || !identifier(p,end,revision,32) ||
       !identifier(p,end,layout,32) || p != end || strcmp(board,"lilygo-s3-long-cst3530") ||
       strcmp(revision,policy.boardRevision) || strcmp(layout,"ota3m-v1")) return false;
+  candidate.protocolMin=low;candidate.protocolMax=high;strcpy(candidate.boardRevision,revision);
   const mbedtls_md_info_t *sha = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
   uint8_t fingerprint[32];
   if (!sha || mbedtls_md(sha,key->der,key->length,fingerprint) || memcmp(fingerprint,key->id,16) ||

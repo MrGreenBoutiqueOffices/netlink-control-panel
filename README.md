@@ -124,6 +124,12 @@ Start with the protocol and USB service; work on OTA diagnosis and CI in paralle
 | `scripts/` | Firmware preparation, asset generation and diagnostic captures |
 | `docs/` | Designs, usage, historical test results and planning |
 
+## Independent Wi-Fi updates
+
+On signed-policy firmware, open **Meer → Updates** to check the latest stable GitHub release and explicitly install it. The panel downloads, verifies and confirms the update itself. For Wi-Fi without a bench server, use `uv run panel wifi setup --port <usb-port> --wifi-only`.
+
+The default build still has no production signing key or verified board revision; activation and hardware acceptance remain required. See [signed updates](docs/signed-updates.md) for setup and recovery behavior.
+
 ## License
 
 The project's own code is licensed under [GPL-3.0-only](LICENSE).

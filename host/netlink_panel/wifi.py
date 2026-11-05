@@ -100,7 +100,25 @@ def load_pairing(path):
     return pairing
 
 
+def provision_wifi_only(args):
+    ssid = input("Wifi-netwerk (2,4 GHz): ")
+    password = getpass.getpass("Wifi-wachtwoord (niet opgeslagen op de Mac): ")
+    if not 1 <= len(ssid.encode()) <= 32 or not 8 <= len(password.encode()) <= 63:
+        raise ValueError("Use an SSID of 1..32 bytes and a WPA2/WPA3 passphrase of 8..63 bytes")
+    with serial.Serial(args.port, 115200, timeout=0.1, write_timeout=1) as device:
+        hello = request(device, {"type": "hello", "id": 1})
+        if "wifi_only_provision_v1" not in hello.get("capabilities", []):
+            raise RuntimeError("Panel firmware does not support standalone Wi-Fi provisioning")
+        response = request(device, {"type": "wifi_config", "id": 2, "ssid": ssid, "password": password})
+        if response.get("ok") is not True:
+            raise RuntimeError("Panel rejected Wi-Fi configuration")
+    report("wifi_configured", panel_id=hello["panel_id"], mode="wifi_only")
+    return 0
+
+
 def provision(args):
+    if getattr(args, "wifi_only", False):
+        return provision_wifi_only(args)
     host = ipaddress.IPv4Address(args.host)
     if host.is_unspecified or host.is_multicast or host.is_loopback:
         raise ValueError("Use the Mac's local-network IPv4 address, not localhost or 0.0.0.0")
@@ -194,7 +212,9 @@ def add_wifi_commands(commands):
     subcommands = wifi.add_subparsers(dest="wifi_command", required=True)
     setup = subcommands.add_parser("setup", help="Prompt for Wi-Fi credentials; provision via USB")
     setup.add_argument("--port", required=True)
-    setup.add_argument("--host", required=True, help="This Mac's reachable LAN IPv4 address")
+    mode = setup.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--host", help="This Mac's reachable LAN IPv4 address for the bench server")
+    mode.add_argument("--wifi-only", action="store_true", help="Wi-Fi for independent panel updates; no bench pairing")
     setup.add_argument("--server-port", type=int, default=8769)
     setup.add_argument("--pairing", type=Path, default=DEFAULT_PAIRING)
     forget = subcommands.add_parser("forget", help="Disable Wi-Fi and erase its panel credentials via USB")

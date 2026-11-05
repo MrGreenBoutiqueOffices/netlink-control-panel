@@ -11,13 +11,20 @@ class PanelDemo {
   static constexpr int MaxHeightMm = 1270;
   static constexpr bool validHeight(int mm) { return mm >= MinHeightMm && mm <= MaxHeightMm; }
   static constexpr int clampHeight(int mm) { return mm < MinHeightMm ? MinHeightMm : mm > MaxHeightMm ? MaxHeightMm : mm; }
-  enum Screen { Desk, Confirm, Moving, Offline, Menu, Monitor, Presets, Settings, SettingsRotated, Boot, Connecting, Updating, Updated, UpdateFailed, Obstructed, Calibrate, Sleep };
+  enum Screen { Desk, Confirm, Moving, Offline, Menu, Monitor, Presets, Settings, SettingsRotated, Boot, Connecting, Updating, Updated, UpdateFailed, Obstructed, Calibrate, Sleep, Updates };
   Screen screen = Desk;
   int height = 740, sit = 740, stand = 1120, target = 780;
   int monitor = 70, brightness = 100, input = 0, dimMinutes = 1;
   bool monitorOn = true, connected = true, rotated = false;
   int progress = 64;
   bool checkingUpdate = false;
+  enum UpdateAction { NoUpdateAction, CheckUpdate, InstallUpdate };
+  UpdateAction updateAction=NoUpdateAction;
+  char updateStatus[80]="Controleer op nieuwe firmware", updateVersion[32]={};
+  bool updateAvailable=false;
+  int updateProgress=0;
+  void updateView(const char *status,const char *version,bool available,int progress);
+  bool idleForUpdate() const { return !finger && !manualHold && !calibrating && screen!=Moving && screen!=Confirm; }
   bool dirty = true, dimmed = false, busy = false;
   bool readOnly = false;
   PanelDeviceState deviceState;
