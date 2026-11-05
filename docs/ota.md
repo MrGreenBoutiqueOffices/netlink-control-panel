@@ -1,80 +1,80 @@
-# Firmware bijwerken via wifi — huidige host-benchroute
+# Updating firmware over Wi-Fi — current host bench route
 
-Dit document beschrijft de bestaande hostgestuurde benchroute. Het [besluit voor #15](signed-updates.md#besluit-het-paneel-beheert-zijn-updates) is zelfstandig downloaden en installeren vanaf het paneel, met lokale bootbevestiging. De webserver valt buiten die updatescope. Dat werkt nog niet in de huidige firmware: onderstaande procedure vereist een gekoppelde host, inclusief `ota_confirm` na reboot.
+This document describes the existing host-driven bench route. The [decision for #15](signed-updates.md#decision-the-panel-owns-its-updates) is independent download and installation on the panel with local boot confirmation. Webserver integration is outside that update scope. This does not work in current firmware yet: the procedure below requires a paired host, including `ota_confirm` after reboot.
 
-Zie [de full-image-diagnose van issue #14](ota-full-image.md) voor de voortgangsafhankelijke hostfix en de nog open fysieke matrix.
+See the [full-image diagnosis for issue #14](ota-full-image.md) for the progress-based host fix and remaining physical matrix.
 
-Vanaf firmware 0.3.2 kan een lopende overdracht na tijdelijk verbindingsverlies worden hervat. Gebruik de bijbehorende actuele hosttool. Zie [de herstelcontrole](ota-recovery-2026-11-03.md) voor de daadwerkelijk uitgevoerde fysieke proeven en de resterende grenzen.
+Since firmware 0.3.2, an ongoing transfer can resume after temporary connection loss. Use the corresponding current host tool. See the [recovery check](ota-recovery-2026-11-03.md) for physical trials actually performed and remaining limitations.
 
-## Eén keer installeren, daarna draadloos
+## Install once, then update wirelessly
 
-Firmware 0.1/0.2 en de fabrieksfirmware bevatten deze updater nog niet. Installeer daarom **één keer versie 0.3.0 via USB**, inclusief de bijbehorende bootloader en partitie-indeling. Bewaar eerst de fabrieksflash en controleer de bordrevisie volgens de README. Dit is geen actie die de hosttool automatisch uitvoert.
+Firmware 0.1/0.2 and factory firmware do not contain this updater. Therefore **install version 0.3.0 once over USB**, including its bootloader and partition layout. Preserve factory flash and check board revision first, following the README. The host tool does not do this automatically.
 
-Stel daarna wifi in met `panel wifi setup` zoals beschreven in [wifi.md](wifi.md). Een al ingestelde 0.2-wificonfiguratie gebruikt hetzelfde NVS-formaat; een normale flash die NVS bewaart kan die blijven gebruiken. Na een volledige flash-erase moet je opnieuw instellen.
+Then configure Wi-Fi with `panel wifi setup` as described in [wifi.md](wifi.md). An existing 0.2 Wi-Fi configuration uses the same NVS format; a normal flash preserving NVS can retain it. After a complete flash erase, configure it again.
 
-Voor volgende versies, vanuit de projectmap:
+For subsequent versions, from the project directory:
 
 ```sh
 uv run --locked pio run --project-dir firmware
 uv run panel wifi update
 ```
 
-De updater kiest standaard `firmware/.pio/build/panel-bench/firmware.bin` en `.secrets/panel.json`. Voor een ander bestand of pairing:
+The updater defaults to `firmware/.pio/build/panel-bench/firmware.bin` and `.secrets/panel.json`. For another file or pairing:
 
 ```sh
 uv run panel wifi update --firmware <firmware.bin> --pairing .secrets/panel-nieuw.json
 ```
 
-Stop eerst een eventueel draaiende `panel wifi serve`: beide programma's gebruiken hetzelfde lokale adres en poort 8769. Het paneel heeft alleen voeding en bereik tot de Mac nodig. Er komt geen extra updatepoort of openbaar accesspoint bij.
+First stop any running `panel wifi serve`: both programs use the same local address and port 8769. The panel needs only power and connectivity to the Mac. No additional update port or public access point is added.
 
-## Wat gebeurt er?
+## What happens?
 
-1. De Mac controleert de ESP32-S3-chipidentiteit, applicatiedescriptor, segmentlengtes, checksum, SHA-256 en de ingebouwde NetLink-bord/protocol/partitie-identiteit. Een bootloader, samengevoegde flashdump, beschadigde image of verkeerd bord wordt geweigerd voordat de netwerkserver start.
-2. Alleen het gekoppelde paneel kan via de bestaande wederzijds geauthenticeerde TLS-PSK-verbinding verbinden. De Mac controleert ook paneelidentiteit, updateondersteuning en startup-self-check.
-3. Het paneel registreert de draaiende image als bekende geldige terugvalversie als de initiële USB-flash nog geen OTA-selectie had. Het schrijft daarna uitsluitend naar het andere applicatieslot. NVS, bootloader, partities en wifigegevens worden niet bijgewerkt.
-4. Elk blok van maximaal 512 bytes moet op de verwachte positie worden bevestigd. Vanaf capability `ota_resume_v1` bewaart het paneel bij wifi/TLS-verlies de flashhandle, schrijfpositie en lopende hash maximaal 60 seconden zonder transferactiviteit. De host staat maximaal vijf herstelpogingen zonder nieuwe bevestigde bytes toe. Alleen een hoger bevestigd offset geeft opnieuw herstelruimte; gelijke of teruggezette offsets doen dat niet. Het totale aantal herverbindingen mag daardoor hoger dan vijf zijn, binnen dezelfde vaste deadline (standaard 600 seconden). Herhaald verloren activatieverzoeken vallen onder hetzelfde begrensde budget. Een herhaald `ota_begin` voor exact dezelfde grootte, beide hashes, profiel en versie retourneert de werkelijk geschreven positie, zonder opnieuw te wissen. De host valideert die positie en verstuurt alleen het resterende deel. Bij een verlopen lease of paneelherstart begint de image opnieuw vanaf nul; de huidige geldige boot blijft geselecteerd. Een andere actieve image wordt geweigerd. USB-overname en expliciet afbreken ruimen de transfer direct op.
-5. Pas na controle van de totale lengte, SHA-256, ingebouwde image-identiteit en ESP-imagevalidatie wordt de bootselectie gewijzigd en herstart het paneel.
-6. De nieuwe firmware is eerst onbevestigd. Het paneel moet opnieuw via TLS verbinden, de verwachte imagehash en versie melden en de startup-self-check doorstaan. De Mac vraagt dan om expliciete bootbevestiging en leest de bevestigde status nogmaals uit.
+1. The Mac checks ESP32-S3 chip identity, application descriptor, segment lengths, checksum, SHA-256 and the embedded NetLink board/protocol/partition identity. A bootloader, merged flash dump, corrupt image or wrong board is rejected before the network server starts.
+2. Only the paired panel can connect over the existing mutually authenticated TLS-PSK connection. The Mac also checks panel identity, update support and startup self-check.
+3. If the initial USB flash had no OTA selection, the panel registers the running image as a known valid fallback. It then writes only the other application slot. NVS, bootloader, partitions and Wi-Fi details are not updated.
+4. Each block of at most 512 bytes must be acknowledged at the expected position. With capability `ota_resume_v1`, the panel retains the flash handle, write position and running hash after Wi-Fi/TLS loss for at most 60 seconds without transfer activity. The host allows at most five recovery attempts without newly confirmed bytes. Only a higher confirmed offset replenishes recovery allowance; equal or reset offsets do not. Total reconnections may therefore exceed five within the same fixed deadline (600 seconds by default). Repeatedly lost activation requests use the same bounded budget. Repeating `ota_begin` for exactly the same size, both hashes, profile and version returns the actual written position without erasing again. The host validates it and sends only the remainder. After lease expiry or panel restart, the image starts again from zero; the current valid boot remains selected. A different active image is rejected. USB takeover and explicit abort immediately clean up the transfer.
+5. Boot selection changes and the panel restarts only after total length, SHA-256, embedded image identity and ESP image validation pass.
+6. New firmware is initially unconfirmed. The panel must reconnect over TLS, report the expected image hash and version and pass startup self-check. The Mac then requests explicit boot confirmation and reads confirmed status again.
 
-De startup-self-check controleert buffer/display-initialisatie en een uitgelezen touchcontrolleridentiteit. Dit bewijst geen juiste pixels, schermoriëntatie of touchcoördinaten; die blijven fysieke tests.
+Startup self-check verifies buffer/display initialization and a read touch-controller identity. This does not prove correct pixels, screen orientation or touch coordinates; those remain physical tests.
 
-Het ontvangstbewijs bewaart fase, verstreken tijd, hoogste bevestigde positie en huidige positie, netto voortgang per seconde, totaal aantal recoveries, de stilstandsbudgetstand en maximaal 32 geschoonde sessiemetingen (firmware, uptime/resetreden, RSSI/wifi-disconnectreden indien aanwezig, TLS- en hello-duur). Overgeslagen oudere sessiemetingen worden geteld. Credentials, netwerknaam, IP en protocolframes worden niet gekopieerd.
+The receipt stores phase, elapsed time, highest confirmed and current positions, net progress per second, total recoveries, stalled-budget state and at most 32 sanitized session measurements (firmware, uptime/reset reason, RSSI/Wi-Fi disconnect reason where available, TLS and hello duration). Omitted older session measurements are counted. Credentials, network name, IP and protocol frames are not copied.
 
-Alleen `ota_confirmed` en exitcode 0 betekenen dat de host de verwachte image en bevestigde boot heeft gezien. Het resultaat staat ook in `artifacts/last-update.json`. Tijdens uploaden zijn de touchknoppen geblokkeerd. Dit prototype bestuurt nog geen echt bureau of monitor.
+Only `ota_confirmed` and exit code 0 mean the host observed the expected image and confirmed boot. The result is also in `artifacts/last-update.json`. Touch buttons are blocked during upload. This prototype does not control a real desk or monitor yet.
 
-## Bij een onderbreking
+## On interruption
 
-- **Tijdens uploaden:** het huidige slot blijft geselecteerd. De host hervat alleen na een nieuwe geauthenticeerde handshake en een manifest dat exact overeenkomt. Bij een verloren blokbevestiging vraagt hij de actuele positie op in plaats van dat blok blind opnieuw te schrijven. Legacy-firmware zonder `ota_resume_v1` krijgt geen automatische uploadretry.
-- **Na activatie maar zonder bevestiging:** de nieuwe firmware wacht maximaal circa 90 seconden en herstart dan. Met de meegeleverde rollback-enabled bootloader wordt een onbevestigde image bij reset verworpen en de bekende vorige versie gekozen. Deze automatische terugval is op het concrete bord gemeten; stroomuitval tijdens activatie is nog niet beproefd.
-- **Na een verloren `ota_finish`-bevestiging:** de host controleert de werkelijk draaiende hash op de volgende verbinding. Als de oude image nog draait en expliciet een behouden transfer meldt, kan dezelfde complete transfer alsnog worden afgerond. Een oude image zonder behouden transfer wordt niet opnieuw geïnstalleerd: dat kan een rollback zijn. Alleen een verloren antwoord bewijst geen succes of mislukking. Een verloren bootbevestiging wordt door dezelfde hash opnieuw te controleren en idempotent te bevestigen opgelost.
-- **Als de host stopt vóór bootbevestiging:** het resultaat is onbevestigd. Laat hem tijdig opnieuw met dezelfde image verbinden met `panel wifi update`; dezelfde gewenste image kan alsnog worden gecontroleerd en bevestigd. Zonder bevestiging kan de bootdeadline tot rollback leiden.
-- **Andere image na reboot:** de tool meldt geen succes; er kan rollback hebben plaatsgevonden. Er volgt geen automatische herinstallatie.
-- **Hetzelfde bestand draait al:** de tool controleert en bevestigt de bestaande boot zonder dezelfde image opnieuw naar flash te sturen. Een gewijzigde build met hetzelfde versienummer wordt via de imagehash onderscheiden.
-- **App die de scheduler/USB uitschakelt of onbruikbare netwerkconfiguratie schrijft:** de prototype-updater garandeert geen herstel bij elke software- of hardwarefout. Bewaar USB als herstelroute; remote recovery blijft een fysieke acceptatie-eis.
+- **During upload:** the current slot remains selected. The host resumes only after a fresh authenticated handshake and an exactly matching manifest. After a lost block acknowledgement it requests the current position rather than blindly rewriting the block. Legacy firmware without `ota_resume_v1` gets no automatic upload retry.
+- **After activation without confirmation:** new firmware waits at most about 90 seconds and then restarts. With the supplied rollback-enabled bootloader, an unconfirmed image is rejected at reset and the known previous version is selected. This automatic fallback was measured on this board; power loss during activation has not been tested.
+- **After a lost `ota_finish` acknowledgement:** the host checks the actual running hash on the next connection. If the old image is still running and explicitly reports a retained transfer, that same complete transfer can still be finished. An old image without a retained transfer is not reinstalled: it may indicate rollback. A lost response alone proves neither success nor failure. Lost boot confirmation is resolved by checking the same hash again and confirming idempotently.
+- **If the host stops before boot confirmation:** the outcome is unconfirmed. Reconnect it in time with the same image using `panel wifi update`; the desired image can still be checked and confirmed. Without confirmation, the boot deadline may cause rollback.
+- **Different image after reboot:** the tool reports no success; rollback may have occurred. There is no automatic reinstall.
+- **Same file already running:** the tool checks and confirms the existing boot without sending the same image to flash again. A changed build with the same version number is distinguished by image hash.
+- **Application disables the scheduler/USB or writes unusable network configuration:** the prototype updater does not guarantee recovery from every software or hardware fault. Retain USB as a recovery route; remote recovery remains a physical acceptance requirement.
 
-Een bevestigde maar functioneel ongewenste versie kan worden vervangen door opnieuw een compatibele oudere 0.3+-applicatie-image te uploaden. Er is geen generieke rollbackknop die willekeurig naar het andere slot schakelt: dat slot kan een afgebroken upload bevatten.
+A confirmed but functionally unwanted version can be replaced by uploading a compatible older 0.3+ application image. There is no generic rollback button that arbitrarily switches to the other slot: it may contain an interrupted upload.
 
-## Ontwikkelen aan het scherm
+## Developing the screen
 
-Behoud de OTA-hooks bij wijzigingen aan de schermcode. `firmware/src/panel_ota.h` bevat `PANEL_FIRMWARE_VERSION` en de vaste profielidentiteit. Je mag herhaaldelijk builds met hetzelfde versienummer testen; de updater vergelijkt de cryptografische imagehash. Een ander hardwarebord, andere applicatieprotocolversie of partitie-indeling vereist een bewuste profielwijziging en valt buiten deze app-updater.
+Retain OTA hooks when changing screen code. `firmware/src/panel_ota.h` contains `PANEL_FIRMWARE_VERSION` and the fixed profile identity. Builds with the same version number can be tested repeatedly; the updater compares the cryptographic image hash. Another hardware board, application protocol version or partition layout requires a deliberate profile change and is outside this application updater.
 
-## Beveiliging en fysieke acceptatie
+## Security and physical acceptance
 
-Autorisatie loopt via de unieke pairingkey en TLS. SHA-256 en ESP-imagevalidatie beschermen de overdracht en bewaken de image-identiteit. Dit is **geen onafhankelijke releasehandtekening, secure boot of anti-rollbackbeveiliging**; iemand met de pairingkey kan een compatibele eigen firmware aanbieden. `.secrets/panel.json` blijft daarom een beheercredential.
+Authorization uses the unique pairing key and TLS. SHA-256 and ESP image validation protect transfer integrity and enforce image identity. This is **not an independent release signature, secure boot or anti-rollback protection**; someone with the pairing key can offer their own compatible firmware. `.secrets/panel.json` therefore remains a management credential.
 
-Lokaal getest: de echte hostcode over TLS met een gesimuleerde paneelreboot, verloren begin-/blok-/finish-/bootbevestigingen, foutieve image na reboot, imageformaat/corruptie, strikte hervatposities en bootbevestiging. De daadwerkelijke firmware-OTA-handler wordt daarnaast gecompileerd tegen fake SDK-flashcalls om dezelfde-manifest-hervatting, behoud van de handle, geen dubbele writes, manifestweigering en leaseverloop te toetsen. De firmware gebruikt ESP-IDF OTA-operaties en de exacte native transferguard wordt ook op de Mac gecompileerd en getest. Dit is geen emulatie van ESP-flash of een fysieke rollbacktest.
+Locally tested: actual host code over TLS with simulated panel reboot, lost begin/block/finish/boot acknowledgements, wrong post-reboot image, image format/corruption, strict resume positions and boot confirmation. The actual firmware OTA handler is also compiled against fake SDK flash calls to test same-manifest resume, handle preservation, no duplicate writes, manifest rejection and lease expiry. Firmware uses ESP-IDF OTA operations and the exact native transfer guard is compiled and tested on the Mac. This is not ESP flash emulation or a physical rollback test.
 
-De actuele fysieke resultaten staan in [het herstelrapport](ota-recovery-2026-11-03.md); oudere proeven en de bewezen onbevestigde-bootrollback staan in [het eerdere robuustheidsrapport](robustness-2026-11-03.md). Nog open: elektrische stroomuitval tijdens schrijven/activeren, echte USB-overname tijdens een transfer, accesspointuitval en meerdaagse stabiliteit. Een wifi/TLS-resume overleeft geen paneelreset; dan wordt veilig opnieuw vanaf nul begonnen. Markeer een Balena-rollout of lokale simulator nooit als fysieke acceptatie.
+Current physical results are in the [recovery report](ota-recovery-2026-11-03.md); earlier trials and demonstrated unconfirmed-boot rollback are in the [earlier robustness report](robustness-2026-11-03.md). Still open: electrical power loss during writing/activation, actual USB takeover during transfer, access point outage and multi-day stability. Wi-Fi/TLS resume does not survive panel reset; it then safely restarts from zero. Never treat a Balena rollout or local simulator as physical acceptance.
 
-Bronnen: [ESP-IDF 4.4.6 OTA en rollback](https://docs.espressif.com/projects/esp-idf/en/v4.4.6/esp32s3/api-reference/system/ota.html), [ESP-IDF OTA-operaties](https://github.com/espressif/esp-idf/blob/v4.4.6/components/app_update/esp_ota_ops.c), [Arduino startup/rollback-hooks](https://github.com/espressif/arduino-esp32/blob/2.0.14/cores/esp32/esp32-hal-misc.c).
+Sources: [ESP-IDF 4.4.6 OTA and rollback](https://docs.espressif.com/projects/esp-idf/en/v4.4.6/esp32s3/api-reference/system/ota.html), [ESP-IDF OTA operations](https://github.com/espressif/esp-idf/blob/v4.4.6/components/app_update/esp_ota_ops.c), [Arduino startup/rollback hooks](https://github.com/espressif/arduino-esp32/blob/2.0.14/cores/esp32/esp32-hal-misc.c).
 
 
-## Herhaalbare fysieke herstelcontrole
+## Repeatable physical recovery check
 
-Gebruik alleen met expliciete toestemming voor twee gedeeltelijke fysieke firmwarewrites, en terwijl de opgegeven image al op het paneel draait:
+Use only with explicit permission for two partial physical firmware writes, while the specified image is already running on the panel:
 
 ```sh
 uv run python scripts/hardware_ota_recovery.py --firmware firmware/.pio/build/panel-bench/firmware.bin --write-inactive-slot
 ```
 
-Dit test vijf seconden serveruitval en een ongelezen blokbevestiging. Het schrijft naar het andere slot, controleert hervatten en breekt daarna expliciet af; het activeert geen image. Stop andere servers/updaters vooraf. Het resultaat staat in `artifacts/ota-recovery-faults.json`.
+This tests five seconds of server outage and an unread block acknowledgement. It writes the other slot, checks resume and explicitly aborts afterwards; it does not activate an image. Stop other servers/updaters first. The result is in `artifacts/ota-recovery-faults.json`.

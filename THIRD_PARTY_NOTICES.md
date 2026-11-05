@@ -16,8 +16,8 @@ The build downloads dependencies; `firmware/.vendor/` and `firmware/.pio/` are n
 | ArduinoJson 6.21.5 | MIT, Benoit BLANCHON; retain the full upstream license text when distributing |
 | Arduino ESP32 core 2.0.14 | The inspected core header states LGPL-2.1-or-later; the SDK, libraries and other components have their own terms |
 | ESP-IDF / mbedTLS | Retain component licenses and notices from the exact SDK used; the application's GPL does not replace them |
-| Arduino_GFX 1.3.7 from the pinned LILYGO source | Current standalone upstream has a BSD license text; it has not yet been established as evidence for this exact vendor copy. Exact provenance and notices to supply remain a publication item |
-| Hynitron touch driver from the pinned LILYGO source | No clear license notice was found in the inspected pinned repository root and driver directory. Distribution permission has not been established yet |
+| Arduino_GFX 1.3.7 from the pinned LILYGO source | The upstream maintainer and license commit confirm a BSD basis; the exact vendor copy includes modifications and additional files. See [GFX research](docs/gfx-license-research.md) and the [upstream BSD text](licenses/Arduino_GFX-BSD-2-Clause.txt); rights/notices for vendor changes remain unresolved |
+| Hynitron touch driver from the pinned LILYGO source | No conclusive permission found for the complete exact copy. Two files match official GPL-published source; the other linked files remain unresolved. See [driver research](docs/touchdriver-license-research.md) |
 | Python `cryptography` 50.0.2 | Package metadata: `Apache-2.0 OR BSD-3-Clause`; retain its notices and any bundled component licenses |
 | Python `pyserial` 3.5 | Package metadata: BSD; retain the license and notices from the distribution used |
 

@@ -56,9 +56,14 @@ def protocol_core(root, commit):
     hashes = {name: digest(data) for name, data in generated.items()}
     if hashes != spec["consumer"]["generated_sha256"]:
         raise ValueError("Protocol core differs from the pinned webserver contract; review compatibility/version first")
+    licenses = {
+        name: (root / name).read_bytes() for name in ("LICENSE", "THIRD_PARTY_NOTICES.md", "preview/assets/OFL.txt")
+    }
     manifest = {
         "schema": spec["schema"],
         "version": spec["version"],
+        "license": "GPL-3.0-only",
+        "license_files_sha256": {name: digest(data) for name, data in licenses.items()},
         "commit": commit,
         "repository": "MrGreenBoutiqueOffices/netlink-control-panel",
         "source_directory": "host/netlink_panel",
@@ -68,7 +73,7 @@ def protocol_core(root, commit):
         "generated_sha256": hashes,
         "consumer": spec["consumer"],
     }
-    files = {**generated, "__init__.py": b"", "UPSTREAM.json": json_bytes(manifest)}
+    files = {**generated, **licenses, "__init__.py": b"", "UPSTREAM.json": json_bytes(manifest)}
     output = io.BytesIO()
     with gzip.GzipFile(filename="", fileobj=output, mode="wb", mtime=0) as zipped:
         with tarfile.open(fileobj=zipped, mode="w", format=tarfile.USTAR_FORMAT) as archive:

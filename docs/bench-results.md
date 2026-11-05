@@ -15,7 +15,7 @@ Date: 2026-11-03. Initial preparation had no connected hardware; see the physica
 | Physical display/touch/USB behavior | USB and Wi-Fi bench passed; user sees IP/status; touch coordinates pending |
 | Remote update and unattended recovery | Physical full updates, automatic TLS-loss resume and confirmed 0.3.3 boot passed; unconfirmed-boot rollback measured earlier; electrical power-loss acceptance pending |
 | Optional Wi-Fi | Actual paired TLS sessions, reconnect and interrupted-transfer recovery passed; AP/power-loss and multi-day stability pending |
-| Real bureau/monitor commands | Intentionally absent from bench prototype |
+| Real desk/monitor commands | Intentionally absent from bench prototype |
 
 Run the documented tests again after modifying the prototype. Update physical acceptance entries only from observed evidence on the identified board.
 

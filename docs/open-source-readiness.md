@@ -11,12 +11,22 @@ The remaining items are tracked in [#34](https://github.com/MrGreenBoutiqueOffic
 - `.secrets/`, `artifacts/`, `firmware/.vendor/` and `firmware/.pio/` are not tracked repository files. GitHub already has release assets and Actions artifacts; these are separate distributions and are not protected by `.gitignore`.
 - Inter includes its OFL license. The build also downloads pinned LILYGO source and SDK/dependencies; see [third-party notices](../THIRD_PARTY_NOTICES.md).
 
+## Findings for #34
+
+- [Exact driver research](touchdriver-license-research.md): 24 of 25 local upstream files are identical; the only local patch disables touch-controller flashing. The existing build links four Hyn implementations. Related official GPL-published source provides a publication trail for two identical files, but does not establish permission for the complete exact copy. Firmware blob headers are not compiled with the current patch; source rights for the driver code actually used are still needed.
+- [GFX research](gfx-license-research.md): the maintainer demonstrably added an upstream BSD license. The LILYGO copy contains substantive changes and additions; these are not automatically relicensed.
+- Remote snapshot: all 42 existing completed Actions log archives, 19 unexpired artifacts and 5 v0.8.0 release assets were downloaded successfully. No downloads were unavailable. A detect-secrets 1.5.0 scan without network verification found 0 candidates in 402 text files, including extracted protocol source and `strings -a` output from firmware binaries. SHA256SUMS for all 20 release/candidate bundles were also verified against the complete binary/archive bytes. See the [content-free inventory with IDs, sizes and SHA-256](evidence/publication-remote-inventory.json). This is a secrets/integrity check, not final license clearance or proof that every possible sensitive item is absent; images were not checked with OCR. The snapshot excludes runs created later for this research PR.
+- Protocol-core 1.0.1 now includes GPL, the third-party inventory and OFL with digests in `UPSTREAM.json`. Protocol/transport code and consumer digests are unchanged. The new archive hash and package version require explicit consumer adoption; existing releases were not overwritten. This does not complete delivery of all firmware notices/source/installation information.
+- The project license is in the still-open PR #35. These research changes build on it; the license must also be on main before publication.
+
+A [specific public question for LILYGO has been prepared](lilygo-license-inquiry-draft.md), but not sent. Posting on behalf of the company requires an explicit instruction first. No driver was replaced and no physical firmware test was performed.
+
 ## Still required before making the repository public
 
 1. Establish the license/distribution permission for the Hynitron touch driver in the pinned LILYGO source. The inspected root and driver directory lack a clear license notice. GPL for our own code does not resolve this. Alternatives are demonstrable permission or a replacement driver with a suitable license; no upstream message has been sent.
 2. Establish applicable notices for the exact Arduino_GFX vendor copy and collect the other notices for the components actually compiled. A license text from current upstream is not automatically evidence for that vendor copy.
 3. Provide applicable licenses, corresponding source and reproducible build information with the firmware assets and protocol-core archive; where required by GPL, also provide installation information for installing modified software. The existing USB recovery route and OTA signing policy must be addressed explicitly. Production signing keys or pairing details are not made public by default.
-4. Review existing releases, Actions artifacts and Actions logs for distribution conditions and sensitive content before changing visibility. The local Git scan did not include these external files and logs. No old assets or runs were deleted.
+4. Review existing releases, Actions artifacts and Actions logs for distribution conditions and sensitive content before changing visibility. The remote snapshot above complements the local Git scan; it does not resolve license/distribution issues for historical firmware. No old assets or runs were deleted.
 
 Once these items are resolved, releases from this repository can directly serve as a public update source. No separate firmware repository or update server is needed. The panel must still verify the independent release signature and compatibility locally; public download access does not establish installation trust.
 

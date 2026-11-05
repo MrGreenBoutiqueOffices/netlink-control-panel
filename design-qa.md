@@ -1,46 +1,46 @@
-# Design QA: uitgebreide displaydemo 0.5.2
+# Design QA: expanded display demo 0.5.2
 
 final result: passed
 
-De derde PDF is als native demo op het fysieke LILYGO-display geïnstalleerd. Er zijn geen open P0/P1/P2-afwijkingen gevonden in de vergeleken toestanden. De fysieke bediening blijft ter beoordeling aan de gebruiker; er wordt geen camerafoto of echte NetLink-aansturing geclaimd.
+The third PDF is installed as a native demo on the physical LILYGO display. No open P0/P1/P2 differences were found in compared states. Physical controls remain for user assessment; no camera photograph or actual NetLink actuation is claimed.
 
-## Bron en normalisatie
+## Source and normalization
 
-- Source visual truth: `docs/design/netlink-bedienpaneel.pdf`, 17 pagina's uit de derde aangeleverde PDF.
-- Bronnen: 1920 × 540 rasterpixels per pagina in 480 × 135 pt; referenties `reference-01.png` t/m `reference-17.png` genormaliseerd naar 640 × 180.
-- Native implementatie: dezelfde C++-renderer als de firmware, 640 × 180 RGB565, density 1:1, geen browser- of hardwarebezel. Dit is de viewport van het embedded apparaat.
-- Full-view paired evidence: [schermen 1–8](docs/design/evidence/native-01-08.png) en [schermen 9–17](docs/design/evidence/native-09-17.png); bron en implementatie zijn in dezelfde beelden naast elkaar vergeleken.
-- Focused evidence: `scene-12.png` toonde een dubbele percentagewaarde. `update-corrected-comparison.png` is na de fix geopend en vergeleken: één waarde op dezelfde verticale positie als de bron.
-- Fysieke implementatie: [Paneel op het apparaat](docs/design/evidence/device-settings-0.5.0.png) toont bronpagina 8 naast een atomische framebufferopname van het echte display. Dit beeld is geopend en vergeleken. Er is een vaste snapshot uitgelezen zonder UI-acties te injecteren; de live pagina ging ondertussen van Paneel naar Ruststand, zonder een gemengd beeld te veroorzaken.
+- Source visual truth: `docs/design/netlink-bedienpaneel.pdf`, 17 pages from the third supplied PDF.
+- Sources: 1920 × 540 raster pixels per page in 480 × 135 pt; references `reference-01.png` through `reference-17.png` normalized to 640 × 180.
+- Native implementation: the same C++ renderer as the firmware, 640 × 180 RGB565, density 1:1, no browser or hardware bezel. This is the embedded device viewport.
+- Full-view paired evidence: [screens 1–8](docs/design/evidence/native-01-08.png) and [screens 9–17](docs/design/evidence/native-09-17.png); source and implementation compared side by side in the same images.
+- Focused evidence: `scene-12.png` showed a duplicate percentage. `update-corrected-comparison.png` was opened and compared after the fix: one value at the same vertical position as the source.
+- Physical implementation: [Panel on the device](docs/design/evidence/device-settings-0.5.0.png) shows source page 8 beside an atomic framebuffer capture from the real display. This image was opened and compared. A fixed snapshot was read without injecting UI actions; the live page changed from Paneel to Ruststand meanwhile without mixing the image.
 
-## Vergelijkingsgeschiedenis en bevindingen
+## Comparison history and findings
 
-- [Opgelost P2] Updatescherm bevatte de statische 64% plus de nieuwe dynamische waarde. De hele oorspronkelijke percentageregio wordt nu gewist en precies één nieuwe waarde wordt uitgelijnd met de voortgangsbalk. Na de fix is opnieuw gerenderd en visueel vergeleken.
-- [Opgelost P2] De eerdere framebufferstream kon bij gelijktijdige bediening een gemengd beeld geven. Vanaf 0.5.0 wordt eerst een volledige kopie in PSRAM gemaakt; iedere chunk heeft een vaste snapshot-id en scenenaam. De echte USB-opname bevestigde coherentie terwijl de live toestand wijzigde.
-- [P3] Het oorspronkelijke font is niet als bruikbaar font in de raster-PDF aanwezig. Dynamische waarden gebruiken lokaal gerasterde Inter met kleine verschillen in glyphbreedte/optisch gewicht. Dit is expliciet geen claim van exacte fontidentiteit.
+- [Resolved P2] The update screen contained static 64% plus the new dynamic value. The entire original percentage region is now cleared and exactly one new value aligned with the progress bar. After the fix it was rendered and visually compared again.
+- [Resolved P2] The earlier framebuffer stream could produce a mixed image during concurrent controls. Since 0.5.0 a complete PSRAM copy is made first; every chunk has a fixed snapshot ID and scene name. The actual USB capture confirmed coherence while live state changed.
+- [P3] The original font is not available as a usable font in the raster PDF. Dynamic values use locally rasterized Inter with small glyph-width/optical-weight differences. This explicitly does not claim identical fonts.
 
-## Vijf fidelity-oppervlakken
+## Five fidelity surfaces
 
-- Typografie: vaste brontekst en pictogrammen komen uit het ontwerp; veranderlijke waarden gebruiken passende Inter-grootten en gewichten. Geen zichtbare afkapping of onbedoelde regelafbreking in de vergeleken pagina's.
-- Layout: grotere pijlen, tweerijenmenu, slider- en instellingenregio's, foutacties en rustbeeld volgen de bron. De rotatie is een volledige 180-graden-pixeltransformatie met corresponderende touchtransformatie.
-- Kleuren: RGB565 en beperkt palette geven geringe verwachte afronding. Groen/oranje semantische meldingen behouden een ruimer palette. De bron en de echte Paneel-opname hebben dezelfde visuele hiërarchie en kleurverdeling.
-- Assets: de 17 schermen en iconen zijn ontleend aan de aangeleverde rasterbron. Geen vervangende handgetekende webiconen of fictieve fotografie. Bron en eerdere ontwerpset zijn in de repository bewaard.
-- Copy: labels en meldingen volgen de PDF. Tijdens een werkelijk onbevestigde nieuwe boot staat er Nieuwe firmware controleren; dat is een bewuste inhoudelijke afwijking om geen bevestigde update te suggereren. De fout-/afstelscenario's blijven lokale demo's.
+- Typography: fixed source text and icons come from the design; changing values use appropriate Inter sizes and weights. No visible clipping or unintended wrapping in the compared pages.
+- Layout: larger arrows, two-row menu, slider/settings regions, error actions and idle screen follow the source. Rotation is a full 180-degree pixel transformation with a corresponding touch transformation.
+- Colors: RGB565 and limited palette cause small expected rounding. Green/orange semantic messages retain a broader palette. The source and actual Paneel capture have the same visual hierarchy and color distribution.
+- Assets: the 17 screens and icons derive from the supplied raster source. No replacement hand-drawn web icons or invented photography. Source and earlier design set are preserved in the repository.
+- Copy: labels and messages follow the PDF. An actual unconfirmed new boot shows Nieuwe firmware controleren; this deliberate content difference avoids implying a confirmed update. Error/calibration scenarios remain local demos.
 
-## Verificatie
+## Verification
 
-Alle 46 lokale regressietests, lint en formattering slagen. De echte native klasse is uitgebreid getest op 17 framebuffers met canaries, nieuwe menu-hitvlakken, omgekeerde pixels, omgekeerde touchcoördinaten, slapen/wakker worden, foutknoppen en begrensd afstellen/stoppen op release. De bestaande tests voor doelhoogte kiezen, tik/hold/release, bevestigen/annuleren, presets en 62–127 cm blijven slagen.
+All 46 local regression tests, lint and formatting pass. The actual native class is extensively tested on 17 framebuffers with canaries, new menu hit areas, inverted pixels, inverted touch coordinates, sleep/wake, error buttons and bounded calibration/stopping on release. Existing target selection, tap/hold/release, confirm/cancel, preset and 62–127 cm tests continue to pass.
 
-0.5.0 is via USB in het geverifieerde actieve applicatieslot geschreven; hashverificatie geslaagd. Bootversie, imagehash, VALID, display/touch-startup-self-check, min/max en snapshot-id zijn op het echte apparaat teruggelezen. De eigenlijke fysieke touch-calibratie en beoordeling van het gevoel blijven gebruikersacceptatie; de USB-verificatie injecteerde geen schermwissels of beweging.
+0.5.0 was written over USB into the verified active application slot; hash verification passed. Boot version, image hash, VALID, display/touch startup self-check, min/max and snapshot ID were read back on the real device. Actual physical touch calibration and feel remain user acceptance; USB verification injected no screen changes or movement.
 
-## Afgerond
+## Completed
 
-1. Alle 17 native schermen met de nieuwste PDF vergeleken en de percentageafwijking opgelost.
-2. Firmware gebouwd en via de gekozen kabelroute geïnstalleerd, zonder NVS/bootloader/partitiewijziging.
-3. Actuele versie en consistente schermuitlezing geverifieerd op het fysieke paneel.
+1. Compared all 17 native screens with the latest PDF and fixed the percentage difference.
+2. Built firmware and installed it through the chosen cable route, without changing NVS/bootloader/partitions.
+3. Verified current version and consistent screen readout on the physical panel.
 
-De browserkopie is niet de primaire implementatie van deze revisie en heeft nog de eerdere ontwerpset. De oudere QA is bewaard onder `docs/design/v2/design-qa.md`.
+The browser copy is not the primary implementation of this revision and still has the earlier design set. Older QA is preserved in `docs/design/v2/design-qa.md`.
 
-## PR-controle 0.5.2
+## PR check 0.5.2
 
-De toegevoegde versieaanduiding is native visueel gecontroleerd: [Paneel met firmwareversie](docs/design/evidence/version-label-0.5.1.png). Firmware 0.5.1 is via USB geïnstalleerd en versie, imagehash, VALID en startup-self-check zijn op het apparaat bevestigd. In 0.5.2 is ook slepen op de helderheidsslider bij 180°-rotatie hersteld, met een regressietest die vóór de fix faalde. Deze laatste correctie is lokaal getest en gebouwd; 0.5.2 is nog niet fysiek geïnstalleerd. De schermafbeelding toont daarom bewust de eerder gecontroleerde 0.5.1.
+The added version label was visually checked natively: [Panel with firmware version](docs/design/evidence/version-label-0.5.1.png). Firmware 0.5.1 was installed over USB and version, image hash, VALID and startup self-check confirmed on-device. 0.5.2 also fixes brightness-slider dragging at 180° rotation, with a regression test that failed before the fix. This latest correction was tested and built locally; 0.5.2 is not physically installed yet. The screenshot therefore deliberately shows the previously verified 0.5.1.

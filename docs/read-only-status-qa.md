@@ -1,15 +1,15 @@
 # Read-only status — native QA
 
-Resultaat: passed voor software/native weergave; geen fysieke NetLink-acceptatie.
+Result: passed for software/native rendering; no physical NetLink acceptance.
 
-Dezelfde C++-renderer als de firmware is gecompileerd en op 640 × 180 gerenderd. De synthetische metingen komen uit de testfixture, niet uit een aangesloten bureau. Alle vijf beelden zijn geopend en gecontroleerd:
+The same C++ renderer as the firmware was compiled and rendered at 640 × 180. Synthetic measurements come from the test fixture, not a connected desk. All five images were opened and inspected:
 
-- [Gemeten hoogte](design/evidence/read-only/height-current.png): 108,6 cm, expliciet Alleen-lezen; pijlen/presets geven geen opdrachten of simulatie.
-- [Laatst bekende hoogte](design/evidence/read-only/height-last-known.png): dezelfde gemeten waarde met tekst LAATST BEKEND, zonder fictieve actualiteitsclaim.
-- [Onbekende hoogte](design/evidence/read-only/height-unknown.png): streepjes, geen 0/74-cm-default of oude glyphresten.
-- [Monitorstatus](design/evidence/read-only/monitor-current.png): 83%, Uit en USB-C uit de fixture; controls zijn niet actief.
-- [Onbekende monitorstatus](design/evidence/read-only/monitor-unknown.png): streepjes/Onbekend, geen fictieve helderheid/power/ingang.
+- [Measured height](design/evidence/read-only/height-current.png): 108.6 cm, explicitly read-only (`Alleen-lezen`); arrows/presets send no commands or simulation requests.
+- [Last-known height](design/evidence/read-only/height-last-known.png): the same measurement with LAATST BEKEND, without a false freshness claim.
+- [Unknown height](design/evidence/read-only/height-unknown.png): dashes, no 0/74-cm default or old glyph remnants.
+- [Monitor status](design/evidence/read-only/monitor-current.png): 83%, Uit and USB-C from the fixture; controls are inactive.
+- [Unknown monitor status](design/evidence/read-only/monitor-unknown.png): dashes/Onbekend, no invented brightness/power/input.
 
-Een gevonden glyphrest bij onbekende hoogte is verwijderd door de hele oorspronkelijke waardezone te wissen. Daarna is opnieuw gerenderd en het onbekende beeld opnieuw geopend. Typografie/kleuren volgen de bestaande Inter/RGB565-weergave; de aangeleverde referentieontwerpen zijn niet gewijzigd.
+A glyph remnant found at unknown height was removed by clearing the entire original value region. The unknown image was then rendered and opened again. Typography/colors follow the existing Inter/RGB565 rendering; supplied reference designs were not changed.
 
-De native tests controleren daarnaast de echte protocolvalidatie, vervallen datalease, onbekende status, niet-klemmen van waarnemingen op commandogrenzen en geblokkeerde read-only aanrakingen. De aparte webserverproef dekt de Waveshare met vaste HDMI1 en een ontbrekende verwachte Dell. Firmware 0.7.0 is gebouwd maar niet fysiek geïnstalleerd; werking en leesbaarheid op een echte NetLink/werkplek volgen na expliciete installatie.
+Native tests also check actual protocol validation, expired data leases, unknown status, observations not being clamped to command limits and blocked read-only touches. The separate webserver trial covers a Waveshare with fixed HDMI1 and a missing expected Dell. Firmware 0.7.0 was built but not physically installed; operation and legibility on a real NetLink/workplace follow an explicitly authorized installation.

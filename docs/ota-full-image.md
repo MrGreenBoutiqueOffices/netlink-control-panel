@@ -1,46 +1,46 @@
-# Grote OTA-image: diagnose en voortgangsafhankelijk herstel
+# Large OTA image: diagnosis and progress-based recovery
 
-Onderdeel van #14. Dit verandert de bestaande bench-updater, geen deploymentarchitectuur. De NetLink-webserverintegratie, geautoriseerde managed updater en signing blijven #15. USB blijft de installatieroute totdat de fysieke full-image-matrix is geaccepteerd.
+Part of #14. This changes the existing bench updater, not the deployment architecture. NetLink webserver integration, an authorized managed updater and signing remain #15. USB remains the installation route until the physical full-image matrix is accepted.
 
-## Vastgestelde hostfout
+## Established host bug
 
-Het bewaarde 0.4.1-rapport toont een image van 1.515.984 bytes en hervatten op offsets 420864, 729600, 1139200 en 1448960. De updater verbruikte desondanks zijn levenslange budget van vijf recoveries en stopte rond 95%. Het rapport bewaart de volledige imagehash en de expliciete eindfout `OTA reconnect budget exhausted`.
+The preserved 0.4.1 report shows a 1,515,984-byte image and resume at offsets 420864, 729600, 1139200 and 1448960. Despite this, the updater exhausted its lifetime budget of five recoveries and stopped around 95%. The report preserves the complete image hash and explicit terminal error `OTA reconnect budget exhausted`.
 
-Een nieuwe test tegen de echte Python-updater over TLS-PSK reproduceerde dezelfde categorie: zes onderbrekingen, telkens ná een geschreven blok waarvan de ACK verloren gaat. Vóór de fix stopte de host na vijf recoveries met `ConnectionError`, terwijl de peer nog aantoonbaar verder kon hervatten. Eén commandoregel reproduceert deze regressie:
+A new test against the actual Python updater over TLS-PSK reproduced the same category: six interruptions, each after a written block whose ACK is lost. Before the fix, the host stopped after five recoveries with `ConnectionError`, although the peer could demonstrably resume further. One command reproduces this regression:
 
 ```sh
 uv run --locked python -m unittest discover -s tests -p test_ota_network.py -k repeated_progressing -v
 ```
 
-De fix maakt herstelruimte afhankelijk van een strikt hogere, gevalideerde schrijfpositie. Alleen die nieuwe voortgang zet de stilstandsteller terug. Gelijke posities, teruggezette posities na een paneelreset en alleen succesvolle handshakes leveren geen extra budget. Het totale aantal recoveries wordt apart bewaard. Vijf herstelpogingen zonder voortgang blijven toegestaan; daarna stopt de host expliciet. Dat geldt ook voor herhaald verloren `ota_finish`-verzoeken: geen eindeloos opnieuw activeren. Een mogelijke activatie blijft bij onvoldoende bewijs `unconfirmed`.
+The fix makes recovery allowance depend on a strictly higher validated write position. Only that new progress resets the stalled counter. Equal positions, reset positions after panel reset and successful handshakes alone grant no extra budget. Total recoveries are recorded separately. Five recovery attempts without progress remain allowed; then the host stops explicitly. This also applies to repeatedly lost `ota_finish` requests: no endless reactivation. Possible activation remains `unconfirmed` when evidence is insufficient.
 
-De globale deadline blijft dezelfde, standaard 600 seconden en maximaal 3600. Herstel verlengt haar niet. Het TLS-handshakebudget is begrensd door de resterende globale tijd. Firmwareleases, gewone bedieningstimeout, blokgrootte en het wireprotocol wijzigen niet. De bestaande 0.3.2+-firmware met `ota_resume_v1` kan deze hostfix al gebruiken. Legacy-firmware zonder capability krijgt geen blinde uploadretry.
+The global deadline stays the same, 600 seconds by default and at most 3600. Recovery does not extend it. The TLS handshake budget is bounded by remaining global time. Firmware leases, normal control timeout, block size and wire protocol do not change. Existing 0.3.2+ firmware with `ota_resume_v1` can already use this host fix. Legacy firmware without the capability receives no blind upload retry.
 
-De host valideert nog steeds offsets en hetzelfde manifest. Een inhoudelijk afgewezen manifest veroorzaakt geen automatische abort van een andere image. Succes vereist de verwachte nieuwe image, versie, startup-self-check en teruggelezen VALID-status; een socket-write of 100%-voortgang is onvoldoende.
+The host still validates offsets and the same manifest. A rejected manifest does not automatically abort another image. Success requires the expected new image, version, startup self-check and read-back VALID status; a socket write or 100% progress is insufficient.
 
-## Metingen en oorzaakafbakening
+## Measurements and cause boundaries
 
-Per geldige hello wordt uitsluitend een begrensde selectie bewaard: firmware-identificatie, uptime/resetreden en numerieke wifi-RSSI/disconnectreden indien aanwezig. Hostmetingen voegen TLS-duur, hello-duur en verstreken tijd toe. Het receipt bevat fase, `confirmed_bytes` (hoogste bevestigde positie), `current_bytes` (laatst gemelde positie van de huidige transfer), netto voortgang per seconde, totale recoveries en `failures_without_progress`. De netto snelheid gebruikt de hoogste positie gedeeld door de totale tijd, inclusief wachten/herstel; dit is geen kale radiosnelheid.
+Each valid hello records only a bounded selection: firmware identifier, uptime/reset reason and numeric Wi-Fi RSSI/disconnect reason where present. Host measurements add TLS duration, hello duration and elapsed time. The receipt contains phase, `confirmed_bytes` (highest confirmed position), `current_bytes` (last reported position of the current transfer), net progress per second, total recoveries and `failures_without_progress`. Net speed uses the highest position divided by total time, including waits/recovery; it is not raw radio throughput.
 
-Maximaal 32 recente sessiemetingen worden bewaard, plus het aantal weggelaten metingen. Bij transportfouten wordt alleen fase en lokale exceptionklasse vastgelegd. TLS-afwijzingen worden geteld; alleen de eerste vijf krijgen een consolemelding. Geen vrije exceptionteksten, credentials, SSID, IP of volledige frames. De doelimagehash blijft in het bestaande manifest zichtbaar.
+At most 32 recent session measurements are retained, plus the count omitted. Transport errors record only phase and local exception class. TLS rejections are counted; only the first five get console messages. No arbitrary exception text, credentials, SSID, IP or complete frames. The target image hash remains visible in the existing manifest.
 
-De fysieke diagnose uit [het eerdere rapport](ota-recovery-2026-11-03.md) mat wifi-verlies vóór de TLS-reset, zonder verstreken control/OTA-timeout. Waarom de associatie werd verbroken is nog niet bewezen. De hier aangetoonde hostbug verklaart waarom een grotere image na meerdere herstelbare storingen definitief faalde; hij bewijst geen oplossing van het radio-/AP-probleem zelf. De nieuwe diagnostiek moet die fysieke afbakening mogelijk maken.
+The physical diagnosis in the [earlier report](ota-recovery-2026-11-03.md) measured Wi-Fi loss before TLS reset, without an expired control/OTA timeout. Why association was lost remains unproven. The host bug demonstrated here explains why a larger image failed permanently after several recoverable interruptions; it does not prove the radio/AP problem itself is solved. New diagnostics must enable that physical distinction.
 
-## Softwarematrix
+## Software matrix
 
-De tests bouwen een echte TLS-PSK-verbinding naar de updater. De paneelpeer simuleert applicatieflash/boot en is geen ESP-flash- of wifi-emulator. Vergelijking van alle ontvangen bytes, hashes en de bevestigde boot detecteert verkeerde offsets of dubbele data.
+Tests establish a real TLS-PSK connection to the updater. The panel peer simulates application flash/boot and is not an ESP flash or Wi-Fi emulator. Comparing all received bytes, hashes and confirmed boot detects wrong offsets or duplicate data.
 
-| Profiel | Verwachte uitkomst |
+| Profile | Expected outcome |
 | --- | --- |
-| Volledige gebouwde firmware, stabiel TLS | Alle bytes en bevestigde boot binnen 60 seconden |
-| Dezelfde volledige image, 1 ms vertraging per blok, zes verloren ACK’s rond 27/48/75/95/96/99% | Hervatten op de werkelijk geschreven posities, volledige bytes en bevestigde boot binnen 60 seconden |
-| Zes disconnects vóór een beginbevestiging, geen voortgang | Stop na maximaal vijf recoveries; geen activatie |
-| Herhaald verloren finish-verzoeken, behouden complete transfer | Begrensd stoppen als unconfirmed; geen fictief succes |
-| Doorgaande maar te trage overdracht, vaste totale deadline 10 seconden | Deadline stopt de overdracht ondanks voortgang; geen activatie |
-| Verloren begin/chunk/finish/confirm-ACK en rebootrace | Een geverifieerde uitkomst of expliciete fout; geen blinde herschrijving |
-| Andere actieve manifestimage | Weigering; de host verstuurt geen abort voor die andere image |
+| Complete built firmware, stable TLS | All bytes and confirmed boot within 60 seconds |
+| Same complete image, 1 ms delay per block, six lost ACKs around 27/48/75/95/96/99% | Resume at actual written positions, complete bytes and confirmed boot within 60 seconds |
+| Six disconnects before begin acknowledgement, no progress | Stop after at most five recoveries; no activation |
+| Repeatedly lost finish requests, retained complete transfer | Bounded stop as unconfirmed; no invented success |
+| Continuing but excessively slow transfer, fixed 10-second total deadline | Deadline stops transfer despite progress; no activation |
+| Lost begin/chunk/finish/confirm ACK and reboot race | A verified outcome or explicit error; no blind rewrite |
+| Different active manifest image | Rejection; host sends no abort for that other image |
 
-Het korte budget van 10 seconden uit de bestaande kleine TLS-fixtures was te klein voor de bewust vertraagde grote image op de ontwikkelmachine. De full-image-test gebruikt daarom 60 seconden; de productie-default is niet verhoogd. Een aparte deadline-test bewijst juist de eindgrens onder aanhoudende voortgang. De test-RSSI van -85 dBm is een synthetisch diagnostiekveld, geen RF-meting of bewijs van een zwakke fysieke verbinding.
+The existing small TLS fixtures' 10-second budget was too short for the deliberately delayed large image on the development machine. The full-image test therefore uses 60 seconds; the production default was not raised. A separate deadline test demonstrates the final boundary under continuous progress. Test RSSI of -85 dBm is a synthetic diagnostics field, not an RF measurement or evidence of a weak physical connection.
 
 ```sh
 uv sync --locked
@@ -49,15 +49,15 @@ uv run --locked pio run --project-dir firmware
 uv run --locked python scripts/check_tests.py
 ```
 
-## Nog uit te voeren fysieke matrix
+## Physical matrix still to run
 
-De softwaretests openen geen fysiek paneel. Start fysieke writes/herstarts alleen als bewust gekozen proef. Gebruik daarvoor een bewust gekozen kandidaat, bekende imagehash, actieve-slot/backupcontrole en één updater-eigenaar. Verander geen wifi-/AP-instellingen als onderdeel van een uploadtest.
+Software tests do not open a physical panel. Start physical writes/restarts only as deliberately selected trials. Use a deliberate candidate, known image hash, active-slot/backup verification and one updater owner. Do not change Wi-Fi/AP settings as part of an upload test.
 
-| Conditie | Minimale acceptatie |
+| Condition | Minimum acceptance |
 | --- | --- |
-| Goed gemeten bereik | Twee volledige uploads met bekende hashes binnen 600 seconden, juiste nieuwe boot en VALID teruggelezen |
-| Zwak gemeten bereik | Dezelfde matrix met vastgelegde RSSI en disconnect-/resetredenen; binnen deadline bevestigen of expliciet veilig falen, geen claim bij ontbrekend bewijs |
-| Eén onderbroken verbinding en één verloren chunk-ACK | Hervatten zonder dubbele bytes; vorige geldige image blijft beschikbaar tot correcte activatie |
-| Herstel-/deadlinebudget uitgeput | Geen succesmelding; daadwerkelijke draaiende image en transferstatus afzonderlijk teruglezen |
+| Measured good coverage | Two full uploads with known hashes within 600 seconds, correct new boot and read-back VALID |
+| Measured weak coverage | Same matrix with recorded RSSI and disconnect/reset reasons; confirm within deadline or fail explicitly and safely, no claim without evidence |
+| One interrupted connection and one lost chunk ACK | Resume without duplicate bytes; previous valid image remains available until correct activation |
+| Recovery/deadline budget exhausted | No success report; read actual running image and transfer status separately |
 
-Bewaar per proef het geschoonde receipt, kandidaat-/huidige versie en hashes, duur, RSSI, recoveries en bootuitkomst. Een softwarematrix, gepubliceerde release of groen CI sluit #14 niet: fysieke full-image-/radiotests blijven vereist. Stroomuitval, alle defecte candidates en meerdaagse recovery blijven daarnaast #16/#19.
+For each trial, retain the sanitized receipt, candidate/current version and hashes, duration, RSSI, recoveries and boot outcome. A software matrix, published release or green CI does not close #14: physical full-image/radio tests remain required. Power loss, all faulty candidates and multi-day recovery also remain #16/#19.

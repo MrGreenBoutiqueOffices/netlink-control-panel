@@ -1,27 +1,27 @@
-# Firmwarecontroles en herleidbare releases
+# Firmware checks and traceable releases
 
-Onderdeel van #23. Firmware/protocol blijven in `netlink-control-panel`; de bestaande webserver-container is de consumer. Er komt geen panel-service-image of extra deploymentpad. Release Drafter beheert de releasenotities en draft. Bij publicatie bouwt de firmwareworkflow assets voor die bestaande release; er wordt geen firmware geïnstalleerd.
+Part of #23. Firmware/protocol remain in `netlink-control-panel`; the existing webserver container is the consumer. No panel-service image or extra deployment path is added. Release Drafter manages release notes and the draft. On publication, the firmware workflow builds assets for that existing release; no firmware is installed.
 
-## Controles op PR en main
+## PR and main checks
 
-De workflowstructuur volgt `python-netlink` en `python-balena-cloud`:
+Workflow structure follows `python-netlink` and `python-balena-cloud`:
 
-| Workflow | Trigger en verantwoordelijkheid |
+| Workflow | Trigger and responsibility |
 | --- | --- |
-| `linting.yaml` — Linting | Push, PR en handmatig; aparte Ruff-, yamllint- en asset/preview-jobs |
-| `tests.yaml` — Testing | Push, PR en handmatig; Python-job met firmwarebuild, alle host/native tests en commitgebonden candidate-artifacts |
-| `release-drafter.yaml` — Release Drafter | Main en handmatig; standaardactie met de centrale organisatieconfiguratie |
-| `release.yaml` — Release | `release.published`; één firmware-releasejob in de `release`-environment |
+| `linting.yaml` — Linting | Push, PR and manual; separate Ruff, yamllint and asset/preview jobs |
+| `tests.yaml` — Testing | Push, PR and manual; Python job with firmware build, all host/native tests and commit-bound candidate artifacts |
+| `release-drafter.yaml` — Release Drafter | Main and manual; standard action with central organization configuration |
+| `release.yaml` — Release | `release.published`; one firmware release job in the `release` environment |
 
-De jobs gebruiken `DEFAULT_PYTHON`, `ubuntu-latest`, setup-uv, expliciet `uv python install` en `uv sync --locked`, zoals de packageprojecten. Lint/test gebruiken uv-cache; de releasejob schakelt die uit. `contents: read` is de standaard; alleen de draft- en releasejobs krijgen de benodigde schrijfrechten. De Actions zijn op dezelfde commit-SHA’s gepind als de voorbeelden. De huidige firmwaretestbaseline is Python 3.14 met TLS-PSK; de runner gebruikt de actuele patchversie van die Pythonreeks.
+Jobs use `DEFAULT_PYTHON`, `ubuntu-latest`, setup-uv, explicit `uv python install` and `uv sync --locked`, like the package projects. Lint/test use the uv cache; the release job disables it. `contents: read` is the default; only draft/release jobs receive required write permissions. Actions are pinned to the same commit SHAs as the examples. The current firmware test baseline is Python 3.14 with TLS-PSK; the runner uses the current patch version of that Python series.
 
-De functionele controles blijven firmwaregericht: vaste Python-/PlatformIO-/libraryversies, immutable LILYGO-bronnen met automatische touchcontrollerflash uitgeschakeld, echte C++-protocol/UI-tests, previewsyntax en geschoonde artifacts. Ontbrekende compiler/ArduinoJson/TLS-PSK of overgeslagen tests leveren geen groene testjob op. `tests.yaml` uploadt een artifact `panel-<commit>` met 30 dagen bewaartermijn.
+Functional checks remain firmware-focused: fixed Python/PlatformIO/library versions, immutable LILYGO source with automatic touch-controller flashing disabled, actual C++ protocol/UI tests, preview syntax and sanitized artifacts. Missing compiler/ArduinoJson/TLS-PSK or skipped tests do not produce a green test job. `tests.yaml` uploads a `panel-<commit>` artifact with 30-day retention.
 
-De generator legt de BASIC-lettertypelayout expliciet vast op macOS en Linux. PNG-referenties worden op identieke afmetingen en RGBA-pixels gecontroleerd; de embedded C++-arrays moeten byte voor byte gelijk blijven.
+The generator explicitly fixes BASIC font layout on macOS and Linux. PNG references are checked at identical dimensions and RGBA pixels; embedded C++ arrays must remain byte-identical.
 
-De bestaande lokale systeemtests blijven bruikbaar op een machine zonder alle CI-voorwaarden, maar `scripts/check_tests.py` accepteert geen skips.
+Existing local system tests remain usable on machines lacking all CI prerequisites, but `scripts/check_tests.py` accepts no skips.
 
-Lokaal hetzelfde controlepad:
+Run the same check path locally:
 
 ```sh
 uv sync --locked --group dev
@@ -37,39 +37,39 @@ uv run --locked python scripts/check_tests.py
 uv run --locked python scripts/release_artifacts.py --output artifacts/candidate
 ```
 
-De uitvoermap moet leeg zijn; de packaging-CLI weigert wijzigingen aan tracked bronbestanden. Bouw altijd opnieuw uit dezelfde schone checkout. Een bestaand bin-bestand met dezelfde versie bewijst op zichzelf niet uit welke commit het gebouwd is. De CI bouwt en verpakt daarom in dezelfde job, zonder een eerder firmwarebuildresultaat te cachen.
+The output directory must be empty; the packaging CLI rejects changes to tracked source files. Always rebuild from the same clean checkout. An existing binary with the same version does not itself prove its source commit. CI therefore builds and packages in the same job without caching an earlier firmware build result.
 
 ## Artifacts
 
-| Bestand | Inhoud |
+| File | Contents |
 | --- | --- |
-| `firmware.bin` | Gevalideerde ESP32-S3-applicatie; geen merged-flash, bootloader, partities of credentials |
-| `manifest.json` | Bronrepo/commit/tag, firmwareversie, bestand- en imagehash, profiel/slotlimiet, protocol-/boardcompatibiliteit, inputdigests, artifactdigests en ondertekeningsstatus |
-| `protocol-core.tar.gz` | Afgebakende versie van `protocol.py` en geselecteerde transportonafhankelijke hostsymbolen, met provenance/digests |
-| `RELEASE_NOTES.md` | Bij een release: de Release Drafter-body van de bestaande gepubliceerde release; bij PR/main: een CI-candidatemelding |
-| `authorization.json` | Alleen bij signed releases: afzonderlijke ECDSA P-256-autorisatierecord en handtekening |
-| `SHA256SUMS` | SHA-256 van alle voorgaande bestanden, inclusief het manifest |
+| `firmware.bin` | Validated ESP32-S3 application; no merged flash, bootloader, partitions or credentials |
+| `manifest.json` | Source repository/commit/tag, firmware version, file/image hashes, profile/slot limit, protocol/board compatibility, input digests, artifact digests and signing status |
+| `protocol-core.tar.gz` | Bounded version of `protocol.py` and selected transport-independent host symbols, with provenance/digests, GPL license and third-party inventory |
+| `RELEASE_NOTES.md` | Release: Release Drafter body of the existing published release; PR/main: CI candidate notice |
+| `authorization.json` | Signed releases only: separate ECDSA P-256 authorization record and signature |
+| `SHA256SUMS` | SHA-256 of all preceding files, including the manifest |
 
-De ESP-imageheader, segmentchecksums, appended imagehash en board-/partitiemarker worden gecontroleerd. Zonder release moeten image, projectversie en fallbackheader overeenkomen. Bij een gepubliceerde release is de gevalideerde tag `v<semver>` leidend: dezelfde versie wordt via een compilerdefine in scherm, handshake en image-marker verwerkt en moet in de gebouwde image terugkomen. De bronbestanden worden niet herschreven. De releasenotities komen uit GitHub; er is geen aparte handmatige changelog of verplichte versiecommit per release. Losse artifacts kunnen met `sha256sum --check SHA256SUMS` op overdrachtscorruptie worden gecontroleerd.
+ESP image header, segment checksums, appended image hash and board/partition marker are checked. Without a release, image, project version and fallback header must match. For a published release, validated tag `v<semver>` is authoritative: a compiler define injects the same version into display, handshake and image marker, and it must appear in the built image. Source files are not rewritten. Release notes come from GitHub; no separate manual changelog or mandatory version commit per release is required. Individual artifacts can be checked for transfer corruption with `sha256sum --check SHA256SUMS`.
 
-Voor dezelfde broncommit, firmwarebytes en releasenotities zijn packaging, manifest en protocolarchive deterministisch, inclusief archivevolgorde, metadata en gzip-tijdstip. De workflow claimt geen bitidentieke ESP-builds tussen verschillende besturingssystemen/toolchains; de daadwerkelijk gebouwde image wordt altijd met zijn eigen digests vastgelegd. Hashes zijn geen authenticiteitsbewijs en vervangen geen releasehandtekening.
+For the same source commit, firmware bytes and release notes, packaging, manifest and protocol archive are deterministic, including archive order, metadata and gzip timestamp. The workflow does not claim bit-identical ESP builds across operating systems/toolchains; each actual built image has its own recorded digests. Hashes are not proof of authenticity and do not replace a release signature.
 
-## Protocolgrens en webserver
+## Protocol boundary and webserver
 
-`release/protocol-core.json` definieert pakketversie 1.0.0, toegestane symbols en uitgesloten serial-imports. Deze pakketversie is onafhankelijk van firmware 0.8.0 en wireprotocol v2. Het pakket bevat geen daemon, CLI, USB-opener of pySerial-import. De webserver blijft eigenaar van zijn SerialX-adapter, sessielifecycle en bestaande status-/commandolaag.
+`release/protocol-core.json` defines package version 1.0.1, allowed symbols and excluded serial imports. Version 1.0.1 adds `LICENSE`, `THIRD_PARTY_NOTICES.md` and `preview/assets/OFL.txt`, with their digests in `UPSTREAM.json`; generated protocol/transport bytes and consumer digests remain unchanged. Archive and manifest version do change, so consumer adoption must explicitly review package version and archive hash. Complete firmware notices and driver rights remain the publication gate in #34. This package version is independent of firmware 0.8.0 and wire protocol v2. The package contains no daemon, CLI, USB opener or pySerial import. The webserver owns its SerialX adapter, session lifecycle and existing status/command layer.
 
-CI vergelijkt de gegenereerde bytes met de consumerselectie uit de gepinde webservercommit in dit contract. Het artifact bevat dezelfde `generated_sha256`-/`upstream_sha256`-grens die de bestaande webserver-vendoring controleert. Een test importeert het verpakte pakket en gebruikt de echte C++-firmwarehandler via een pseudo-terminal: handshake, read-only device-state, snapshot en geweigerde acties moeten werken. Een gewijzigde consumerdigest blokkeert packaging totdat pakketversie, contract en compatibiliteit bewust zijn beoordeeld.
+CI compares generated bytes against the consumer selection from the webserver commit pinned in this contract. The artifact contains the same `generated_sha256`/`upstream_sha256` boundary checked by existing webserver vendoring. A test imports the packaged core and uses the actual C++ firmware handler through a pseudo-terminal: handshake, read-only device state, snapshot and rejected actions must work. A changed consumer digest blocks packaging until package version, contract and compatibility are deliberately reviewed.
 
-Dit is een test van het protocolpakket en het vastgelegde consumercontract, geen volledige webserver-container-/fleettest. De private webserverrepository wordt niet met extra credentials vanuit PR-CI opgehaald. De webserver behoudt voorlopig zijn bestaande immutable broncommit en digestcontrole; overstappen op het releaseartifact vereist een eigen webserver-PR met commit/pakketversie/archivehash en bestaande consumer-/runtimechecks. De open webserver-PR’s en submodulepointers worden hier niet gewijzigd.
+This tests the protocol package and recorded consumer contract, not the complete webserver container/fleet. The private webserver repository is not fetched using extra credentials from PR CI. The webserver retains its existing immutable source commit and digest checks for now; adopting the release artifact requires a separate webserver PR with commit/package version/archive hash and existing consumer/runtime checks. Open webserver PRs and submodule pointers are not changed here.
 
-## Release Drafter en release-assets
+## Release Drafter and release assets
 
-`release-drafter.yaml` gebruikt dezelfde minimale job als `python-balena-cloud`: één Release Drafter-actie op main of een handmatige run, met de geërfde centrale categorieën en versie-resolver. Er is geen checkout, eigen versie-initialisatie of lokale kopie van de configuratie. v0.8.0 is gepubliceerd; volgende drafts volgen de bestaande releasehistorie en PR-labels. Controleer vóór publicatie de voorgestelde versie en notities.
+`release-drafter.yaml` uses the same minimal job as `python-balena-cloud`: one Release Drafter action on main or a manual run, with inherited central categories and version resolver. There is no checkout, custom version initialization or local configuration copy. v0.8.0 is published; subsequent drafts follow existing release history and PR labels. Review the proposed version and notes before publication.
 
-De maintainer controleert en publiceert de draft in GitHub. `release.yaml` start op `release.published`, zoals de package-releaseworkflow. De releasejob draait in de `release`-environment en checkt de **exacte releasetag** uit. Hij valideert main-ancestry en de versie, stelt de firmwareversie voor de build in, bouwt de image en draait de host/native tests. Er is geen tweede publicatie-/uploadjob en er is geen artifactoverdracht tussen workflows nodig.
+The maintainer reviews and publishes the draft in GitHub. `release.yaml` starts on `release.published`, like the package release workflow. The release job runs in the `release` environment and checks out the **exact release tag**. It validates main ancestry and version, sets firmware version for the build, builds the image and runs host/native tests. There is no second publication/upload job or cross-workflow artifact transfer.
 
-De releasebody uit het publicatie-event wordt als `RELEASE_NOTES.md` meegenomen. De job verpakt de image, controleert `SHA256SUMS` en uploadt de vijf bench-assets of zes signed assets met `svenstaro/upload-release-action` naar de bestaande release-ID. De bestaande Release Drafter-titel en -body blijven behouden. Assets worden niet overschreven; dubbele namen laten de upload falen. Bij een gedeeltelijk mislukte upload blijven mogelijk assets staan; controleer die vóór een nieuwe poging. Een release heeft pas bruikbare firmware-assets als de releasejob geslaagd is. PR-/testworkflows maken geen tags of releases aan.
+The publication event's release body is included as `RELEASE_NOTES.md`. The job packages the image, checks `SHA256SUMS` and uploads the five bench assets or six signed assets using `svenstaro/upload-release-action` to the existing release ID. Existing Release Drafter title and body are preserved. Assets are not overwritten; duplicate names fail the upload. A partially failed upload may leave assets behind; inspect them before retrying. A release has usable firmware assets only after its release job succeeds. PR/test workflows create no tags or releases.
 
-De standaardpolicy produceert expliciet **unsigned bench-artifacts**. De optionele ondertekening en verificatie op host/paneel staan in [ondertekende updates](signed-updates.md). Een signed release vereist vooraf gereviewde publieke trust, bekende boardrevision en een private secret in environment `release`; bij ontbrekende of ongeldige configuratie faalt de job. PR-CI gebruikt uitsluitend tijdelijke testsleutels. Productiekeyprovisioning en de zelfstandige wifi-lifecycle op het paneel blijven binnen #15 open; webserverintegratie voor updates valt buiten deze scope. Een Release Drafter-draft, gepubliceerde release of groene CI is geen fysieke installatie, OTA-acceptatie of toestemming voor beweging.
+The default policy produces explicitly **unsigned bench artifacts**. Optional signing and host/panel verification are described in [signed updates](signed-updates.md). A signed release requires previously reviewed public trust, known board revision and a private secret in environment `release`; missing or invalid configuration fails the job. PR CI uses only ephemeral test keys. Production key provisioning and the panel's independent Wi-Fi lifecycle remain open within #15; webserver update integration is outside this scope. A Release Drafter draft, published release or green CI is not physical installation, OTA acceptance or movement permission.
 
-De bestaande fleet-first route blijft leidend voor de NetLink-hostsoftware: een reviewbare consumerpin gaat via de webserver-image naar NetLink develop/dev, acceptance en stable production. Paneelfirmware krijgt daarnaast zelfstandig downloaden en installeren via wifi, zonder verplichte webserver of Balena-deploy. Het paneel gebruikt de ondertekende release-assets en zijn lokale verificatiepolicy. De concrete distributiebron, bereikbaarheid en kanaalkeuze voor het paneel blijven nog uit te werken binnen #15; een private GitHub-release is niet vanzelf toegankelijk vanaf het paneel. Deze releaseworkflow bouwt en publiceert assets en start geen installatie op hardware. Adoptie van protocol-core-artifacts in de webserver en die rolloutacceptatie blijven afzonderlijk vervolgwerk binnen #23; een updatefunctie in de webserver hoort niet bij #15.
+The existing fleet-first route remains authoritative for NetLink host software: a reviewed consumer pin goes through the webserver image to NetLink develop/dev, acceptance and stable production. Panel firmware will also gain independent Wi-Fi downloading and installation without requiring a webserver or Balena deployment. The panel uses signed release assets and its local verification policy. Actual distribution source, reachability and channel selection still need to be implemented within #15; a private GitHub release is not automatically accessible by the panel. This release workflow builds and publishes assets and initiates no hardware installation. Protocol-core artifact adoption in the webserver and its rollout acceptance remain separate work within #23; a webserver update feature is not part of #15.

@@ -1,48 +1,48 @@
 # NetLink panel protocol v2
 
-Dit is het contract voor de panel-service. Het is onafhankelijk van USB of een geauthenticeerde wifi-stream. Firmware 0.6.0 en host 0.6.0 implementeren de handshake en volledige paneelstatus. Echte bureau-/monitoracties, configuratiesynchronisatie en beheerde updates worden pas vrijgegeven met hun eigen capabilities en adapters. De firmware blijft een lokale demo; `desk` en `monitor` zijn daarom `null`.
+This is the panel-service contract. It is independent of USB or an authenticated Wi-Fi stream. Firmware 0.6.0 and host 0.6.0 implement the handshake and full panel status. Real desk/monitor actions, configuration synchronization and managed updates will be enabled only with their own capabilities and adapters. Firmware remains a local demo; `desk` and `monitor` are therefore `null`.
 
-Het bestaande [benchprotocol v1](protocol.md) blijft beschikbaar voor demo, USB-provisioning en diagnostiek/herstel. Een v2-sessie accepteert geen v1-berichten. Een v1-client kan een actieve v2-sessie niet overnemen; na disconnect verloopt de sessie binnen 3,5 seconden. Firmwareversie 0.6.0 in de bron betekent niet dat deze al op een fysiek paneel is geïnstalleerd.
+The existing [bench protocol v1](protocol.md) remains available for demos, USB provisioning and diagnostics/recovery. A v2 session accepts no v1 messages. A v1 client cannot take over an active v2 session; after disconnect the session expires within 3.5 seconds. Source firmware version 0.6.0 does not mean it is already installed on a physical panel.
 
-## Framing en compatibiliteit
+## Framing and compatibility
 
-- UTF-8 JSON-objecten, één per newline; maximaal 1024 bytes exclusief newline. USB CDC gebruikt 115200 baud. Geen logging op de protocolstream.
-- Elke v2-envelope heeft integer `v: 2` en een niet-lege `type`. Een request/response heeft integer `id` in 1..2147483647, uniek binnen de sessie. Bool is geen integer-ID.
-- Host en paneel moeten een overlappend `protocol_min`/`protocol_max` hebben; deze implementatie ondersteunt alleen 2. De host weigert onbekende boardprofielen, andere paneelidentiteiten, andere boardrevisies, ongeldige bootstatus en ontbrekende capabilities.
-- Framingversie 1 en 2 zijn geïsoleerd. Alleen v2 kan deze handshake onderhandelen; een onbekende envelopeversie wordt genegeerd en leidt op de host tot een begrensde timeout. Een v2-hello met een incompatibel bereik krijgt `incompatible_protocol`.
-- Onbekende optionele velden mogen worden genegeerd; een betekeniswijziging van bestaande velden vereist een nieuwe contractversie/capability. Een frameoverschrijding wordt tot de volgende newline weggegooid; foutieve frames vernieuwen geen heartbeat.
+- UTF-8 JSON objects, one per newline; at most 1024 bytes excluding newline. USB CDC uses 115200 baud. No logging on the protocol stream.
+- Every v2 envelope has integer `v: 2` and nonempty `type`. A request/response has integer `id` in 1..2147483647, unique within the session. A boolean is not an integer ID.
+- Host and panel must have overlapping `protocol_min`/`protocol_max`; this implementation supports only 2. The host rejects unknown board profiles, different panel identities, different board revisions, invalid boot state and missing capabilities.
+- Framing versions 1 and 2 are isolated. Only v2 can negotiate this handshake; an unknown envelope version is ignored and produces a bounded host timeout. A v2 hello with an incompatible range gets `incompatible_protocol`.
+- Unknown optional fields may be ignored; changing existing field semantics requires a new contract version/capability. Oversized frames are discarded through the next newline; invalid frames do not renew heartbeat liveness.
 
-## Handshake en identiteit
+## Handshake and identity
 
-De host kiest per verbinding een cryptografisch willekeurige `session` van 32 lowercase hextekens. Responses, status en heartbeats horen bij die sessie; laat ontvangen frames uit een andere sessie worden niet toegepast.
+For each connection, the host chooses a cryptographically random `session` of 32 lowercase hex characters. Responses, status and heartbeats belong to that session; late frames from another session are not applied.
 
 ```json
 {"v":2,"type":"hello","id":1,"session":"0123456789abcdef0123456789abcdef","protocol_min":2,"protocol_max":2}
 ```
 
-Het paneel antwoordt met dezelfde id en sessie, plus:
+The panel responds with the same ID and session, plus:
 
-| Veld | Betekenis |
+| Field | Meaning |
 | --- | --- |
-| `panel_id` | Stabiele paneelidentiteit, apart van de USB-seriecode |
-| `board_profile` | `lilygo-s3-long-cst3530` voor deze build |
-| `board_revision` | Voorlopig `unverified`: geen automatische detectie of claim van een vastgestelde PCB-revisie |
-| `firmware` | Firmwareversie uit de gedeelde versiebron |
-| `protocol_min`, `protocol_max` | Ondersteund contractbereik, nu beide 2 |
-| `boot_id` | 16 willekeurige hextekens per boot; geen persistent apparaat-ID |
-| `boot_state`, `self_test_ok` | De service accepteert uitsluitend `valid` en `true` |
-| `capabilities` | Nu alleen `panel.status.v1` |
-| `actions` | Nu leeg; de host heeft nog geen actuatieroute |
+| `panel_id` | Stable panel identity, separate from the USB serial |
+| `board_profile` | `lilygo-s3-long-cst3530` for this build |
+| `board_revision` | Currently `unverified`: no automatic detection or claim of an established PCB revision |
+| `firmware` | Firmware version from the shared version source |
+| `protocol_min`, `protocol_max` | Supported contract range, currently both 2 |
+| `boot_id` | 16 random hex characters per boot; not a persistent device ID |
+| `boot_state`, `self_test_ok` | The service accepts only `valid` and `true` |
+| `capabilities` | Currently only `panel.status.v1` |
+| `actions` | Currently empty; the host has no actuation route yet |
 
-Een gezonde startup-self-check bevestigt initialisatie; het is geen test van fysieke touchkwaliteit of echte bureauveiligheid. Enrollment pinnt USB VID, PID, seriecode én handshake-identiteit/profiel/revisie. Het is een lokale autorisatie op de host, geen wederzijdse cryptografische USB-authenticatie. Alleen status wordt nu ontsloten; aansturingsrechten en enrolled-host-verificatie op het paneel moeten vóór echte besturing worden afgedwongen.
+A healthy startup self-check confirms initialization; it is not a physical touch-quality or real desk-safety test. Enrollment pins USB VID, PID, serial and handshake identity/profile/revision. This is local host authorization, not mutual cryptographic USB authentication. Only status is currently exposed; control rights and enrolled-host verification on the panel must be enforced before real control is enabled.
 
-De firmwarehandler is voor beide streams identiek. De bestaande wifi-stream vereist zijn eigen TLS-PSK-authenticatie; de nieuwe Linux-service implementeert in deze PR uitsluitend USB. Transportselectie/fallback en wifi-enrollment blijven vervolgwerk. Een actieve andere sessie of OTA-procedure levert `busy`; deze handshake onderbreekt nooit een lopende OTA.
+The firmware handler is identical for both streams. The existing Wi-Fi stream requires its own TLS-PSK authentication; the new Linux service implements only USB in this PR. Transport selection/fallback and Wi-Fi enrollment remain future work. Another active session or OTA operation returns `busy`; this handshake never interrupts an ongoing OTA.
 
-## Liveness en status
+## Liveness and status
 
-Beide peers sturen elke seconde `heartbeat` met `session`; het paneel voegt `uptime_ms` toe. Alleen een geldige heartbeat uit de actieve sessie of een geaccepteerd request vernieuwt firmwareliveness. De host hanteert 3,5 seconden en een afzonderlijke requestdeadline. Handshake mag maximaal acht seconden duren om USB-reset/boot op te vangen; binnen die periode worden alleen hello-pogingen herhaald.
+Both peers send `heartbeat` with `session` every second; the panel adds `uptime_ms`. Only a valid heartbeat from the active session or an accepted request renews firmware liveness. The host uses 3.5 seconds and a separate request deadline. Handshake may take at most eight seconds to accommodate USB reset/boot; only hello attempts are repeated during that period.
 
-Na iedere handshake vraagt de host een volledige snapshot en daarna periodiek opnieuw:
+After each handshake, the host requests a full snapshot and repeats it periodically:
 
 ```json
 {"v":2,"type":"state.get","id":2,"session":"0123456789abcdef0123456789abcdef"}
@@ -52,46 +52,46 @@ Na iedere handshake vraagt de host een volledige snapshot en daarna periodiek op
 {"v":2,"type":"state.snapshot","id":2,"session":"0123456789abcdef0123456789abcdef","revision":1,"sampled_uptime_ms":1234,"valid_for_ms":3500,"state":{"self_test_ok":true,"mode":"standalone_demo","desk":null,"monitor":null}}
 ```
 
-`revision` stijgt per snapshot binnen één sessie, vanaf 1. Dit is een observatierevisie, ook als de waarden gelijk blijven. `sampled_uptime_ms` is het 32-bits lokale paneeltijdstip; het is geen klok die met de host gesynchroniseerd wordt. Nieuwe boot/sessie betekent een nieuwe revisiereeks. Deltas zijn nog niet geïmplementeerd; volledige snapshots zijn voor dit kleine contract de enige statusvorm.
+`revision` increases per snapshot within a session, starting at 1. This is an observation revision even when values stay the same. `sampled_uptime_ms` is the panel's 32-bit local timestamp, not a host-synchronized clock. A new boot/session starts a new revision sequence. Deltas are not implemented; full snapshots are the only status form in this small contract.
 
-De host vermindert `valid_for_ms` met de gemeten requestduur en publiceert een eigen ontvangsttijd. Consumers mogen een snapshot alleen gebruiken zolang die resterende lease geldig is. `panel-service status` berekent dat opnieuw, ook na een gecrashte service of teruggezette klok. Een verlopen snapshot wordt als stale zonder paneel-/apparaatstatus teruggegeven. Een heartbeat alleen maakt oude status niet actueel.
+The host subtracts measured request duration from `valid_for_ms` and publishes its own receipt timestamp. Consumers may use a snapshot only while the remaining lease is valid. `panel-service status` recalculates this even after a service crash or a clock moving backwards. An expired snapshot is returned stale without panel/device status. A heartbeat alone does not make old status fresh.
 
-## Actiecontract voor volgende adapters
+## Action contract for future adapters
 
-Voor latere echte bediening geldt normatief:
+The following is normative for later real controls:
 
-1. `action.request` bevat sessie, unieke request-id, `action`, gevalideerde `args` en `ttl_ms` (1..3500). TTL loopt bij de ontvangende adapter vanaf ontvangst; de host gebruikt daarnaast zijn eigen deadline en verstuurt nooit een vooraf verlopen opdracht.
-2. `action.result` gebruikt dezelfde sessie en id. `stage: received` bevestigt alleen syntactische ontvangst; `accepted` alleen toelating door de bevoegde actuatoradapter; `completed` alleen een aantoonbare fysieke uitkomst. Ontbreekt uitkomstfeedback, dan volgt `unknown`, nooit een verzonnen `completed`.
-3. `rejected`, `failed`, `expired` en `unknown` zijn expliciete einduitkomsten met een vaste `code`. Een TCP/USB-write of MQTT-publish is geen voltooiing.
-4. Binnen een sessie behandelt de toekomstige adapter duplicaat-id's idempotent: zelfde inhoud geeft dezelfde bekende uitkomst, andere inhoud wordt geweigerd. Hij mag dezelfde actie niet nogmaals uitvoeren. Een sessie heeft geen overneembare pending acties; reconnect start met lege autorisatie en snapshot.
-5. Reconnect, transportwissel, stop, update of verlopen liveness wist pending bewegingen. Geen automatische retry of replay van beweging. Stopgedrag moet ook bij hostcrash bij de component die nog kan stoppen worden geborgd.
+1. `action.request` contains session, unique request ID, `action`, validated `args` and `ttl_ms` (1..3500). TTL starts on receipt by the receiving adapter; the host also uses its own deadline and never sends an already expired command.
+2. `action.result` uses the same session and ID. `stage: received` confirms only syntactic receipt; `accepted` only admission by the authorized actuator adapter; `completed` only a demonstrable physical outcome. Without outcome feedback, report `unknown`, never invented `completed`.
+3. `rejected`, `failed`, `expired` and `unknown` are explicit terminal outcomes with a fixed `code`. A TCP/USB write or MQTT publish is not completion.
+4. Within a session, the future adapter handles duplicate IDs idempotently: identical content returns the same known outcome, different content is rejected. It must not execute the same action again. A session has no transferable pending actions; reconnect starts with empty authorization and a snapshot.
+5. Reconnect, transport change, stop, update or expired liveness clears pending movements. No automatic movement retry or replay. Stop behavior must also be enforced on host crash by the component still able to stop.
 
-De huidige handler retourneert voor elke `action.request` alleen `action.result` met `stage: rejected` en `code: unsupported_action`; hij voert niets uit en adverteert geen acties. Deze toekomstige stages/deadlines zijn een contract, nog geen geïmplementeerde MQTT-action-engine. Zie issue #10 voor capability- en idempotentiehandhaving op de echte commandoroute.
+The current handler returns only `action.result` with `stage: rejected` and `code: unsupported_action` for every `action.request`; it executes nothing and advertises no actions. These future stages/deadlines are a contract, not an implemented MQTT action engine. See issue #10 for capability and idempotency enforcement on the real command route.
 
-## Afbakening en fouten
+## Scope and errors
 
-Demo-, provisioning- en updatecommando's zijn geen productieacties. Ze worden in een v2-sessie geweigerd. `state.get` is de enige huidige productierequest na hello. Onbekende berichten leveren `unsupported_message`; ontbrekende/andere sessie levert `session_required`; ongeldig request levert `invalid_request`. Geen fouttekst bevat credentials of vrije peerdata.
+Demo, provisioning and update commands are not production actions. They are rejected in a v2 session. `state.get` is the only current production request after hello. Unknown messages return `unsupported_message`; missing/different sessions return `session_required`; invalid requests return `invalid_request`. No error text contains credentials or arbitrary peer data.
 
-Bij disconnect gooit de host sessie, decoderbuffer en outstanding requests weg. Discovery begint opnieuw met de gepinde USB-identiteit, daarna volgen handshake en full snapshot. Een ander of vervangend paneel wordt niet automatisch enrolled.
+On disconnect, the host discards session, decoder buffer and outstanding requests. Discovery restarts with the pinned USB identity, followed by handshake and full snapshot. A different or replacement panel is not automatically enrolled.
 
-## Verificatie
+## Verification
 
-`tests/test_service.py` compileert de echte `ProductionSession`-handler met de gepinde ArduinoJson-library en verbindt die via pseudoterminals met de Python-service. De suite dekt identiteit/versies/health, revisies, statusfreshness, onbekende acties, framingisolatie en re-enumeratie. De firmwarebuild controleert de wiring voor USB en wifi. Dit is geen fysieke USB-, radio-, stroom- of NetLink-acceptatie.
+`tests/test_service.py` compiles the actual `ProductionSession` handler with the pinned ArduinoJson library and connects it to the Python service through pseudo-terminals. Coverage includes identity/versions/health, revisions, status freshness, unknown actions, framing isolation and re-enumeration. The firmware build checks USB and Wi-Fi wiring. This is not physical USB, radio, power or NetLink acceptance.
 
-## Read-only apparaatstatus vanaf 0.7.0
+## Read-only device status since 0.7.0
 
-De nieuwe capability `device.state.v1` accepteert een hostrequest `device.state` met dezelfde sessie/id, oplopende `revision`, `valid_for_ms` (1–3000), `desk` en `monitor`. Beide apparaatvelden zijn expliciet object of `null`. Zonder capability verstuurt de host dit bericht niet. Alle `action.request` blijven afgewezen; er wordt geen bureau-/monitoractie uitgevoerd.
+The new `device.state.v1` capability accepts a host `device.state` request with the same session/ID, increasing `revision`, `valid_for_ms` (1–3000), `desk` and `monitor`. Both device fields are explicitly an object or `null`. Without the capability, the host does not send this message. All `action.request` remain rejected; no desk/monitor action is performed.
 
-`desk` bevat integer `height_mm` (0–3000) en boolean `fresh`. Dit is een waarneming: de commandogrenzen 620–1270 mm worden niet op werkelijke metingen geklemd. `monitor` bevat de gekozen numerieke `bus` (maximaal 8 tekens), `brightness` (0–100 of null), `power` (`on`/`off`/`standby` of null), `source` (maximaal 24 zichtbare ASCII-tekens of null) en boolean `fresh`. Ontbrekende metingen worden niet vervangen door defaults. Een vaste HDMI-bron van een Waveshare is geldige read-only status, ook zonder source-switchcapability.
+`desk` contains integer `height_mm` (0–3000) and boolean `fresh`. This is an observation: command limits 620–1270 mm are not used to clamp actual measurements. `monitor` contains the selected numeric `bus` (at most 8 characters), `brightness` (0–100 or null), `power` (`on`/`off`/`standby` or null), `source` (at most 24 visible ASCII characters or null) and boolean `fresh`. Missing measurements are not replaced with defaults. A fixed Waveshare HDMI source is valid read-only status even without source-switch capability.
 
-De firmware valideert de volledige snapshot vóór toepassing. Een ongeldige, dubbele of oudere revisie vervangt niets en vernieuwt de datalease niet. Antwoord is `device.state.ack` met dezelfde sessie/id en toegepaste revisie. Na verlopen lease, sessieverlies of nieuwe handshake worden alle apparaatwaarden onbekend. Een heartbeat alleen vernieuwt de datalease niet. Nieuwe waarden maken geen slapend scherm wakker.
+Firmware validates the entire snapshot before applying it. An invalid, duplicate or older revision replaces nothing and does not renew the data lease. The response is `device.state.ack` with the same session/ID and applied revision. Lease expiry, session loss or a new handshake makes all device values unknown. A heartbeat alone does not renew the data lease. New values do not wake a sleeping screen.
 
-Het display toont gemeten hoogte en helderheid/power/ingang; `fresh:false` krijgt de tekst LAATST BEKEND. Onbekende waarden verschijnen als `--`/Onbekend. Bureau-/monitorbediening, presets en fysieke demo-reset/scenariogebaren zijn in deze modus geblokkeerd; lokale paneelinstellingen en navigatie blijven beschikbaar. Een expliciete bench-scene kan de standalone demo opnieuw openen nadat de productie-eigenaar is gestopt. Geen automatische terugval naar demowaarden bij verlies van de host.
+The display shows measured height and brightness/power/input; `fresh:false` gets LAATST BEKEND. Unknown values appear as `--`/Onbekend. Desk/monitor controls, presets and physical demo-reset/scenario gestures are blocked in this mode; local panel settings and navigation remain available. An explicit bench scene can reopen the standalone demo after the production owner has stopped. No automatic fallback to demo values on host loss.
 
-`state.snapshot.state.mode` blijft vóór de eerste `device.state` voor oude hosts `standalone_demo`; daarna is het `read_only`, ook na leaseverloop. De bijgewerkte hostcore accepteert beide modes. Nieuwe host plus oude firmware behoudt statusbewaking maar verstuurt geen apparaatstatus. Installeer host en firmware daarom als gekoppelde, capability-gecontroleerde wijzigingen.
+For old hosts, `state.snapshot.state.mode` remains `standalone_demo` before the first `device.state`; afterwards it is `read_only`, including after lease expiry. The updated host core accepts both modes. A new host with old firmware retains status monitoring but sends no device status. Install host and firmware as paired, capability-checked changes.
 
-De webserver blijft eigenaar van MQTT-status. De upstream hostmodule krijgt alleen generieke requestvelden en modecompatibiliteit; de webserver gebruikt daarvoor de bestaande SerialX-adapter, zonder pySerial terug toe te voegen. Firmware 0.7.0 wordt in deze wijziging gebouwd en native getest, niet automatisch op het fysieke paneel geïnstalleerd.
+The webserver retains MQTT status ownership. The upstream host module receives only generic request fields and mode compatibility; the webserver uses its existing SerialX adapter without reintroducing pySerial. This change builds and natively tests firmware 0.7.0; it does not automatically install it on the physical panel.
 
-## Lokale paneelconfiguratiestatus vanaf 0.8.0
+## Local panel configuration status since 0.8.0
 
-De optionele capability `panel.config.status.v1` voegt `state.panel_config` toe aan de bestaande snapshot. Deze bevat schema, opgeslagen revisie, paneelhelderheid, rotatie, dimtijd en begrensde opslagstatus. Geen credentials, bureaupresets of beheerde writes. Zie [het opslag- en eigenaarschapscontract](panel-settings.md). Onbekende configuratieverzoeken blijven geweigerd; dit verleent geen extra apparaat- of configuratierechten.
+Optional capability `panel.config.status.v1` adds `state.panel_config` to the existing snapshot. It contains schema, saved revision, panel brightness, rotation, dim timeout and bounded storage status. No credentials, desk presets or managed writes. See the [storage and ownership contract](panel-settings.md). Unknown configuration requests remain rejected; this grants no extra device or configuration rights.
