@@ -126,6 +126,6 @@ Start with the protocol and USB service; work on OTA diagnosis and CI in paralle
 
 ## License
 
-The project's own code is licensed under the [GNU General Public License version 3](LICENSE), SPDX `GPL-3.0-only`. When distributing derived software, the corresponding source must be made available under the same license; commercial use is permitted. This choice does not transfer copyright ownership.
+The project's own code is licensed under [GPL-3.0-only](LICENSE).
 
-Third-party components retain their own licenses and copyright notices. Inter remains under the SIL Open Font License; see [third-party notices](THIRD_PARTY_NOTICES.md). Licensing our code does not automatically clear the entire compiled firmware for distribution. See [publication readiness](docs/open-source-readiness.md) for outstanding items.
+Third-party code, fonts and assets retain their original licenses and copyright notices; see [third-party notices](THIRD_PARTY_NOTICES.md).
