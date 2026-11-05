@@ -1,6 +1,6 @@
-# Draft inquiry to LILYGO — not sent
+# Archived draft inquiry to LILYGO — not sent
 
-Target repository: `Xinyuan-LilyGO/T-Display-S3-Long`. The inquiry below is ready for a public GitHub issue. No message has been posted on behalf of the company.
+Target repository: `Xinyuan-LilyGO/T-Display-S3-Long`. The inquiry below was prepared for a public GitHub issue. The owner subsequently chose not to pursue it. It is retained as research context; no message has been posted on behalf of the company.
 
 ## Title
 
