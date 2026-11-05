@@ -3,6 +3,8 @@ name = "netlink-panel"
 version = "0.8.0"
 description = "USB and authenticated Wi-Fi bench prototype for the NetLink LILYGO control panel"
 requires-python = ">=3.11"
+license = "GPL-3.0-only"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "preview/assets/OFL.txt"]
 dependencies = [
     "cryptography==50.0.2",
     "pyserial==3.5",
