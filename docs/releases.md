@@ -45,7 +45,7 @@ De uitvoermap moet leeg zijn; de packaging-CLI weigert wijzigingen aan tracked b
 | --- | --- |
 | `firmware.bin` | Gevalideerde ESP32-S3-applicatie; geen merged-flash, bootloader, partities of credentials |
 | `manifest.json` | Bronrepo/commit/tag, firmwareversie, bestand- en imagehash, profiel/slotlimiet, protocol-/boardcompatibiliteit, inputdigests, artifactdigests en ondertekeningsstatus |
-| `protocol-core.tar.gz` | Afgebakende versie van `protocol.py` en geselecteerde transportonafhankelijke hostsymbolen, met provenance/digests |
+| `protocol-core.tar.gz` | Afgebakende versie van `protocol.py` en geselecteerde transportonafhankelijke hostsymbolen, met provenance/digests, GPL-licentie en third-party-inventaris |
 | `RELEASE_NOTES.md` | Bij een release: de Release Drafter-body van de bestaande gepubliceerde release; bij PR/main: een CI-candidatemelding |
 | `authorization.json` | Alleen bij signed releases: afzonderlijke ECDSA P-256-autorisatierecord en handtekening |
 | `SHA256SUMS` | SHA-256 van alle voorgaande bestanden, inclusief het manifest |
@@ -56,7 +56,7 @@ Voor dezelfde broncommit, firmwarebytes en releasenotities zijn packaging, manif
 
 ## Protocolgrens en webserver
 
-`release/protocol-core.json` definieert pakketversie 1.0.0, toegestane symbols en uitgesloten serial-imports. Deze pakketversie is onafhankelijk van firmware 0.8.0 en wireprotocol v2. Het pakket bevat geen daemon, CLI, USB-opener of pySerial-import. De webserver blijft eigenaar van zijn SerialX-adapter, sessielifecycle en bestaande status-/commandolaag.
+`release/protocol-core.json` definieert pakketversie 1.0.1, toegestane symbols en uitgesloten serial-imports. Versie 1.0.1 voegt `LICENSE`, `THIRD_PARTY_NOTICES.md` en `preview/assets/OFL.txt` toe, met hun digests in `UPSTREAM.json`; de gegenereerde protocol-/transportbytes en consumerdigests blijven gelijk. Het archive en de manifestversie veranderen wel, zodat een consumeradoptie expliciet pakketversie en archivehash moet beoordelen. De volledige firmware-notices en driverrechten blijven de publicatiegate van #34. Deze pakketversie is onafhankelijk van firmware 0.8.0 en wireprotocol v2. Het pakket bevat geen daemon, CLI, USB-opener of pySerial-import. De webserver blijft eigenaar van zijn SerialX-adapter, sessielifecycle en bestaande status-/commandolaag.
 
 CI vergelijkt de gegenereerde bytes met de consumerselectie uit de gepinde webservercommit in dit contract. Het artifact bevat dezelfde `generated_sha256`-/`upstream_sha256`-grens die de bestaande webserver-vendoring controleert. Een test importeert het verpakte pakket en gebruikt de echte C++-firmwarehandler via een pseudo-terminal: handshake, read-only device-state, snapshot en geweigerde acties moeten werken. Een gewijzigde consumerdigest blokkeert packaging totdat pakketversie, contract en compatibiliteit bewust zijn beoordeeld.
 

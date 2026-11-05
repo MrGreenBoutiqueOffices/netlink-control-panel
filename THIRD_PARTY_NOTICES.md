@@ -16,8 +16,8 @@ De build haalt dependencies op; `firmware/.vendor/` en `firmware/.pio/` worden n
 | ArduinoJson 6.21.5 | MIT, Benoit BLANCHON; volledige upstream-licentietekst bij distributie behouden |
 | Arduino ESP32 core 2.0.14 | De geraadpleegde core-header vermeldt LGPL-2.1-or-later; SDK, libraries en andere componenten hebben eigen voorwaarden |
 | ESP-IDF / mbedTLS | Componentlicenties en notices uit de exacte gebruikte SDK behouden; de applicatie-GPL vervangt ze niet |
-| Arduino_GFX 1.3.7 uit de gepinde LILYGO-bron | De huidige afzonderlijke upstream heeft een BSD-licentietekst; die is nog niet als bewijs voor deze exacte vendorcopy vastgesteld. Exacte herkomst en mee te leveren notices blijven een publicatiepunt |
-| Hynitron-touchdriver uit de gepinde LILYGO-bron | In de geraadpleegde gepinde repositoryroot en drivermap is geen duidelijke licentievermelding gevonden. Distributietoestemming is nog niet vastgesteld |
+| Arduino_GFX 1.3.7 uit de gepinde LILYGO-bron | Upstream-maintainer en licentiecommit bevestigen een BSD-basis; de exacte vendorcopy heeft aanpassingen en extra bestanden. Zie [GFX-onderzoek](docs/gfx-license-research.md) en de [upstream-BSD-tekst](licenses/Arduino_GFX-BSD-2-Clause.txt); rechten/notices voor vendorwijzigingen blijven open |
+| Hynitron-touchdriver uit de gepinde LILYGO-bron | Geen sluitende toestemming voor de volledige exacte copy gevonden. Twee bestanden matchen officiële GPL-source; de andere gelinkte bestanden blijven onopgelost. Zie [driveronderzoek](docs/touchdriver-license-research.md) |
 | Python `cryptography` 50.0.2 | Package metadata: `Apache-2.0 OR BSD-3-Clause`; eigen notices en eventuele meegeleverde componentlicenties behouden |
 | Python `pyserial` 3.5 | Package metadata: BSD; de licentie en vermeldingen uit de gebruikte distributie behouden |
 

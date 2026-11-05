@@ -100,13 +100,30 @@ class ReleaseArtifactTests(unittest.TestCase):
     def test_core_has_exact_consumer_hashes_and_no_serial_or_daemon(self):
         data, manifest = release.protocol_core(ROOT, "1" * 40)
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
-            self.assertEqual(set(archive.getnames()), {"UPSTREAM.json", "__init__.py", "protocol.py", "transport.py"})
+            self.assertEqual(
+                set(archive.getnames()),
+                {
+                    "UPSTREAM.json",
+                    "__init__.py",
+                    "protocol.py",
+                    "transport.py",
+                    "LICENSE",
+                    "THIRD_PARTY_NOTICES.md",
+                    "preview/assets/OFL.txt",
+                },
+            )
             transport = archive.extractfile("transport.py").read()
             for forbidden in [b"import serial", b"def open_usb", b"def run(", b"def main("]:
                 self.assertNotIn(forbidden, transport)
             for name, expected in manifest["consumer"]["generated_sha256"].items():
                 self.assertEqual(hashlib.sha256(archive.extractfile(name).read()).hexdigest(), expected)
-            self.assertEqual(json.load(archive.extractfile("UPSTREAM.json"))["version"], "1.0.0")
+            upstream = json.load(archive.extractfile("UPSTREAM.json"))
+            self.assertEqual(upstream["version"], "1.0.1")
+            self.assertEqual(upstream["license"], "GPL-3.0-only")
+            for name in ["LICENSE", "THIRD_PARTY_NOTICES.md", "preview/assets/OFL.txt"]:
+                content = archive.extractfile(name).read()
+                self.assertEqual(content, (ROOT / name).read_bytes())
+                self.assertEqual(hashlib.sha256(content).hexdigest(), upstream["license_files_sha256"][name])
 
     def test_packaged_core_communicates_with_actual_firmware_endpoint(self):
         # The webserver injects its own SerialX stream; the packaged core must
