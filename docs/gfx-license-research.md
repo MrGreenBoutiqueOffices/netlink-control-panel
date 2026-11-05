@@ -1,24 +1,24 @@
-# Onderzoek licentie van de exacte Arduino_GFX-vendorcopy
+# License research for the exact Arduino_GFX vendor copy
 
-Onderzocht op 2026-11-05. Geen firmware of dependency vervangen. De source is de door LILYGO meegeleverde map `lib/Arduino_GFX-1.3.7` uit commit `3deece89098f25e7d155e41e4e0f5dd8b368ab02`.
+Researched on 2026-11-05. No firmware or dependency was replaced. The source is LILYGO's bundled `lib/Arduino_GFX-1.3.7` directory from commit `3deece89098f25e7d155e41e4e0f5dd8b368ab02`.
 
-## Wat wel vaststaat
+## Established findings
 
-De eigen upstream-maintainer reageerde in [Arduino_GFX #240](https://github.com/moononournation/Arduino_GFX/issues/240) op de licentievraag en voegde op 22 augustus 2023 [commit 372094ccbf2579a5a568ca59e5315250bf1ae080](https://github.com/moononournation/Arduino_GFX/commit/372094ccbf2579a5a568ca59e5315250bf1ae080) toe. De [licentietekst op dat commit](https://github.com/moononournation/Arduino_GFX/blob/372094ccbf2579a5a568ca59e5315250bf1ae080/license.txt) is BSD met twee voorwaarden en copyright Adafruit Industries 2012. Een ongewijzigde kopie staat in [licenses/Arduino_GFX-BSD-2-Clause.txt](../licenses/Arduino_GFX-BSD-2-Clause.txt). Dit is primaire onderbouwing van de upstream-licentie, geen willekeurig gekozen licentie voor de hele vendorcopy.
+The upstream maintainer responded to the license question in [Arduino_GFX #240](https://github.com/moononournation/Arduino_GFX/issues/240) and added [commit 372094ccbf2579a5a568ca59e5315250bf1ae080](https://github.com/moononournation/Arduino_GFX/commit/372094ccbf2579a5a568ca59e5315250bf1ae080) on 22 August 2023. The [license text at that commit](https://github.com/moononournation/Arduino_GFX/blob/372094ccbf2579a5a568ca59e5315250bf1ae080/license.txt) is two-clause BSD, copyright Adafruit Industries 2012. An unchanged copy is in [licenses/Arduino_GFX-BSD-2-Clause.txt](../licenses/Arduino_GFX-BSD-2-Clause.txt). This is primary evidence of the upstream license, not an arbitrarily selected license for the entire vendor copy.
 
-De discussie benoemt dat upstream code uit andere projecten heeft gebruikt. Bestaande componentcopyrights/voorwaarden moeten daarom behouden blijven; de maintainerreactie kan andere rechthebbenden niet vervangen.
+The discussion acknowledges that upstream used code from other projects. Existing component copyrights/conditions must therefore be retained; the maintainer's response cannot replace other copyright holders' permissions.
 
-## Vergelijking met de vendorcopy
+## Comparison with the vendor copy
 
-De officiële tag [v1.3.7](https://github.com/moononournation/Arduino_GFX/tree/597ad3e6da7aa6008b7ce69711f6c9ec78d4b635) bevat zelf nog geen rootlicentiebestand. Alle 274 vendorbestanden zijn per relatief pad vergeleken met officiële GitHub-archives van deze tag en het licentiecommit. `exact` betekent identieke bytes; `whitespace` betekent dat uitsluitend witruimte wegfilteren de bestanden gelijk maakt, geen bewijs van gelijke licentierechten.
+Official tag [v1.3.7](https://github.com/moononournation/Arduino_GFX/tree/597ad3e6da7aa6008b7ce69711f6c9ec78d4b635) does not yet contain a root license file. All 274 vendor files were compared by relative path against official GitHub archives of this tag and the license commit. `exact` means identical bytes; `whitespace` means only filtering whitespace makes the files equal, not evidence of identical license rights.
 
-| Referentie | Exact | Alleen whitespace verschillend | Inhoudelijk verschillend | Alleen in vendorcopy |
+| Reference | Exact | Whitespace differences only | Substantive differences | Vendor only |
 | --- | ---: | ---: | ---: | ---: |
 | v1.3.7, `597ad3e6da7aa6008b7ce69711f6c9ec78d4b635` | 183 | 71 | 7 | 13 |
-| Licentiecommit `372094ccbf2579a5a568ca59e5315250bf1ae080` | 164 | 45 | 52 | 13 |
+| License commit `372094ccbf2579a5a568ca59e5315250bf1ae080` | 164 | 45 | 52 | 13 |
 
-Inhoudelijke sourceverschillen t.o.v. v1.3.7 zitten in `src/Arduino_GFX_Library.h`, `src/Arduino_DataBus.cpp`, `src/Arduino_GFX.cpp`, `src/Arduino_GFX.h`, `src/Arduino_TFT.cpp` en `src/databus/Arduino_ESP32QSPI.h`; de zevende afwijking is README. De 13 vendor-only bestanden omvatten onder andere extra displayimplementaties voor AXS15231, CO5300 en SH8601 en extra voorbeelden. Die verschillen zijn nog geen toegewezen licentie. De exacte vendorcopy is dus geen ongewijzigde herverpakking van de upstream-tag.
+Substantive source differences from v1.3.7 are in `src/Arduino_GFX_Library.h`, `src/Arduino_DataBus.cpp`, `src/Arduino_GFX.cpp`, `src/Arduino_GFX.h`, `src/Arduino_TFT.cpp` and `src/databus/Arduino_ESP32QSPI.h`; the seventh difference is README. The 13 vendor-only files include additional display implementations for AXS15231, CO5300 and SH8601 and extra examples. Those differences do not themselves establish a license. The exact vendor copy is therefore not an unchanged repackaging of the upstream tag.
 
-## Conclusie
+## Conclusion
 
-De upstream-BSD-basis is vastgesteld en vastgelegd. De rechten/notices voor LILYGO-specifieke aanpassingen en toevoegingen blijven een concrete vraag voor LILYGO. De blanketclaim dat alle code in de vendorcopy aantoonbaar BSD-2-Clause is wordt niet gedaan. Deze vraag is opgenomen in de [nog niet verstuurde licentievraag](lilygo-license-inquiry-draft.md); #34 blijft hiervoor open.
+The upstream BSD basis is established and recorded. Rights/notices for LILYGO-specific modifications and additions remain a specific question for LILYGO. No blanket claim is made that all code in the vendor copy is demonstrably BSD-2-Clause. This question is included in the [unsent license inquiry](lilygo-license-inquiry-draft.md); #34 remains open for it.

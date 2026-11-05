@@ -1,75 +1,75 @@
-# Zelfstandige ontwerp-preview op het LILYGO-display
+# Standalone design preview on the LILYGO display
 
-De firmware simuleert een bureau en monitor volledig lokaal. Er is geen NetLink, MQTT, UART-bureau of DDC/CI-monitor aangesloten. De touchbediening is onafhankelijk van een USB- of wifi-beheersessie. Hoogtes en voorkeuren bestaan alleen in RAM en beginnen na herstart weer op de demowaarden.
+The firmware simulates a desk and monitor entirely locally. No NetLink, MQTT, desk UART or DDC/CI monitor is connected. Touch controls are independent of a USB or Wi-Fi management session. Heights and preferences exist only in RAM and return to demo values after restart.
 
-## Versienummer op het display
+## Version number on the display
 
-Vanaf 0.5.1 toont Meer → Paneel onder HELDERHEID PANEEL de firmwareversie. De tekst gebruikt dezelfde versiebron als de beheer- en updateprotocollen en draait mee met het scherm.
+Since 0.5.1, More → Panel (`Meer` → `Paneel`) shows the firmware version below HELDERHEID PANEEL. The text uses the same version source as the management and update protocols and rotates with the screen.
 
-0.5.2 herstelt daarnaast slepen op de helderheidsslider wanneer het paneel 180 graden gedraaid is. Deze correctie is lokaal getest; de laatste fysieke installatie is 0.5.1.
+0.5.2 also fixes dragging the brightness slider when the panel is rotated 180 degrees. This fix was tested locally; the latest physical installation is 0.5.1.
 
-## Nieuwe ontwerpset in 0.5.0
+## New design set in 0.5.0
 
-De derde aangeleverde PDF bevat 17 schermen. 0.5.0 voegt grotere pijlen, het menu in twee rijen, normaal/180 graden draaien, het minimale rustscherm en de uitgewerkte opstart-, verbindings-, update-, fout-, obstakel- en afstelschermen toe. De doelhoogtebediening en 62–127-cm-grenzen blijven gelden.
+The third supplied PDF contains 17 screens. 0.5.0 adds larger arrows, the two-row menu, normal/180-degree rotation, the minimal idle screen and the expanded startup, connection, update, error, obstacle and calibration screens. Target-height controls and the 62–127-cm limits remain in effect.
 
-Draaien verandert zowel de volledige framebuffer als de touchcoördinaten. Het blijft een RAM-instelling voor deze demo. Na de ingestelde inactiviteit verschijnt het rustige scherm met alleen de hoogte; de eerste aanraking wekt de eerdere pagina zonder actie uit te voeren.
+Rotation changes both the entire framebuffer and touch coordinates. It remains a RAM setting in this demo. After the configured inactivity period, a quiet height-only screen appears; the first touch wakes the previous page without performing an action.
 
-Extra voorbeelden op het display: open Meer en houd het lege vak rechtsonder minimaal één seconde vast. In de statusvoorbeelden ga je verder door links minimaal één seconde vast te houden. Foutknoppen zoals Later en OK keren terug naar Bureau; Opnieuw opent het verbindingsvoorbeeld. In Afstellen verlaagt de grote vasthoudknop alleen de lokale voorbeeldhoogte, stopt op release en gaat nooit onder 62 cm. De scenariomodus laadt de voorbeeldwaarden uit het ontwerp.
+Additional examples on the display: open More (`Meer`) and hold the empty bottom-right area for at least one second. In status examples, advance by holding the left side for at least one second. Error buttons such as Later and OK return to Desk (`Bureau`); Opnieuw opens the connection example. In Calibration (`Afstellen`), the large hold button lowers only the local example height, stops on release and never goes below 62 cm. Scenario mode loads the example values from the design.
 
-Echte OTA-voortgang gebruikt het nieuwe updatebeeld met het werkelijke percentage. Een nieuwe, nog te bevestigen boot krijgt expliciet de tekst Nieuwe firmware controleren. Tijdens die echte beheeractie is de demo geblokkeerd. De andere fout-/obstakel-/afstelschermen zijn lokale ontwerpscenario's, geen NetLink-integratie.
+Actual OTA progress uses the new update image with the real percentage. A new boot awaiting confirmation explicitly shows Nieuwe firmware controleren. The demo is blocked during that real management action. Other error/obstacle/calibration screens are local design scenarios, not NetLink integration.
 
-0.5.0 is via USB geïnstalleerd op het geïdentificeerde display; esptool verifieerde de geschreven flashhash. Via USB zijn daarna versie, verwachte imagehash, VALID-status, startup-self-check en grenzen teruggelezen. Een coherente snapshot van Paneel bleef behouden terwijl de live UI naar Ruststand ging. Er zijn in die eindcontrole geen schermwissels geïnjecteerd. Bewijs: `artifacts/display-0.5.0/verification.json` en `comparison.png`.
+0.5.0 was installed over USB on the identified display; esptool verified the written flash hash. USB was then used to read back version, expected image hash, VALID state, startup self-check and limits. A coherent snapshot of Panel (`Paneel`) was preserved while the live UI entered Idle (`Ruststand`). No screen changes were injected during that final check. Evidence: `artifacts/display-0.5.0/verification.json` and `comparison.png`.
 
-## Bediening vanaf 0.4.3
+## Controls since 0.4.3
 
-- De ondergrens is 62 cm en de bovengrens 127 cm (620–1270 mm). Tikken, vasthouden, presets, demo-invoer en bevestigde bewegingen respecteren deze grenzen.
-- Een korte tik op Hoger of Lager past alleen de doelhoogte met 1 cm aan.
-- Vasthouden herhaalt die doelhoogtestap na 350 ms, vervolgens iedere 180 ms. Loslaten of buiten de pijl slepen stopt het aanpassen; het donkere bevestigingsscherm blijft staan.
-- De huidige hoogte blijft tijdens het kiezen gelijk. Alleen Bevestigen start de gesimuleerde beweging. Annuleren verwerpt de keuze.
-- Ook Zitten en Staan kiezen eerst een doelhoogte. Bevestigen start de simulatie naar die preset.
-- Tijdens een bevestigde beweging stopt één aanraking ergens op het scherm de simulatie.
-- Meer opent Monitor, Voorkeuren en Paneel. Monitor biedt demohelderheid, aan/uit en ingang; Voorkeuren bewaart de huidige demohoogte als preset; Paneel biedt helderheid, dimtijd en draaien. Sliders reageren op tikken en slepen.
-- Houd Meer op het beginscherm ongeveer één seconde vast om de gesimuleerde verbinding te verbreken/herstellen. Bij die offline-status zijn bureauacties geblokkeerd; lokale paneelinstellingen blijven bruikbaar.
-- Na de ingestelde dimtijd maakt de eerste aanraking het scherm wakker en voert nog geen andere actie uit.
+- The lower limit is 62 cm and the upper limit 127 cm (620–1270 mm). Taps, holds, presets, demo input and confirmed movements respect these limits.
+- A short tap on Hoger or Lager changes only the target height by 1 cm.
+- Holding repeats that target-height step after 350 ms, then every 180 ms. Release or dragging outside the arrow stops adjustment; the dark confirmation screen remains.
+- Current height stays unchanged while selecting. Only Bevestigen starts simulated movement. Annuleren discards the selection.
+- Zitten and Staan also select a target height first. Bevestigen starts simulation toward that preset.
+- During confirmed movement, one touch anywhere on the screen stops the simulation.
+- Meer opens Monitor, Voorkeuren and Paneel. Monitor offers demo brightness, power and input; Voorkeuren saves the current demo height as a preset; Paneel offers brightness, dim timeout and rotation. Sliders respond to taps and drags.
+- Hold Meer on the home screen for about one second to disconnect/reconnect the simulated connection. Desk actions are blocked in that offline state; local panel settings remain usable.
+- After the configured dim timeout, the first touch wakes the screen without performing another action.
 
-De referentie is `docs/design/netlink-bedienpaneel.pdf` (de derde PDF; de vorige versie is bewaard in `docs/design/v2/`), met zeventien schermen op 640 × 180. De originele schermbeelden zijn compact als RGB565/RLE opgenomen; veranderlijke tekst gebruikt lokaal gegenereerde Inter-glyphs. Het oorspronkelijke font is niet beschikbaar als bruikbaar webfont in de raster-PDF; de beperkte typografische afwijking is gedocumenteerd in `design-qa.md`.
+The reference is `docs/design/netlink-bedienpaneel.pdf` (the third PDF; the previous version is preserved in `docs/design/v2/`), with seventeen 640 × 180 screens. Original screen images are embedded compactly as RGB565/RLE; changing text uses locally generated Inter glyphs. The original font is unavailable as a usable webfont in the raster PDF; the limited typographic difference is documented in `design-qa.md`.
 
-## Assets opnieuw genereren
+## Regenerate assets
 
 ```sh
 uv run scripts/generate_demo_assets.py
 uv tool run --from platformio==6.1.18 pio run --project-dir firmware
 ```
 
-De generator heeft gepinde optionele afhankelijkheden in zijn scriptmetadata. De gewone firmwarebuild gebruikt de ingecheckte gegenereerde bestanden en heeft die Python-pakketten niet nodig.
+The generator pins optional dependencies in its script metadata. A normal firmware build uses the checked-in generated files and does not need those Python packages.
 
-## Herhaalbare controles
+## Repeatable checks
 
-`tests/test_panel_demo.py` compileert exact dezelfde C++-toestandsmachine en renderer als de firmware. Het test korte tik, vasthouden, release, doel versus huidige hoogte, bevestigen, annuleren, stop, offline-blokkering, voorkeuren, sliders, dimmen en framebuffergrenzen.
+`tests/test_panel_demo.py` compiles exactly the same C++ state machine and renderer as the firmware. It tests short taps, hold, release, target versus current height, confirmation, cancellation, stop, offline blocking, preferences, sliders, dimming and framebuffer bounds.
 
 ```sh
 uv run python -m unittest discover -s tests -p test_panel_demo.py -v
 ```
 
-`scripts/capture_panel_demo.py` leest de echte framebuffer uit en kan lokale demoschermen en voorbeeldinvoer kiezen. Dat verandert alleen RAM-demotoestand, nooit firmware of echte apparatuur. Start het niet tijdens een gebruikersbeoordeling: het wisselt schermen en kan botsen met echte aanrakingen.
+`scripts/capture_panel_demo.py` reads the actual framebuffer and can select local demo screens and example input. It changes only RAM demo state, never firmware or real equipment. Do not start it during a user review: it switches screens and may conflict with real touches.
 
-## Vastgelegde beperkingen
+## Recorded limitations
 
-0.4.0 is via wifi geïnstalleerd en bevestigd. De eerste vier schermbeelden zijn van het echte paneel uitgelezen; een volgende opname werd terecht gestopt doordat tijdens de opname een aanraking de toestand veranderde. De oude directe-move-interpretatie in 0.4.1 is vervangen door alleen-doelhoogte-bewerking in 0.4.2.
+0.4.0 was installed and confirmed over Wi-Fi. The first four screen images were read from the actual panel; a later capture was correctly stopped because a touch changed state during capture. The old direct-move interpretation in 0.4.1 was replaced with target-height-only editing in 0.4.2.
 
-De grote 0.4.1-wifi-overdracht brak rond 95% af na het reconnectbudget. Hervatten werkt, maar wifi-OTA is met deze verbinding en grotere image nog niet voldoende betrouwbaar. USB is daarom de gekozen installatieroute. De bootselectie en fysieke ESP32-S3/MAC zijn vóór schrijven gecontroleerd; alleen het actieve applicatieslot wordt via de kabel bijgewerkt, zonder NVS/bootloader/partitievervanging.
+The large 0.4.1 Wi-Fi transfer failed around 95% after exhausting the reconnect budget. Resume works, but Wi-Fi OTA on this connection and larger image is not reliable enough yet. USB is therefore the chosen installation route. Boot selection and physical ESP32-S3/MAC were checked before writing; only the active application slot is updated over the cable, without replacing NVS/bootloader/partitions.
 
-0.4.3 is via USB geïnstalleerd en de geschreven flashhash is door esptool geverifieerd. Daarna zijn via dezelfde USB-verbinding de draaiende versie, verwachte imagehash, VALID-status en geslaagde display/touch-startup-self-check teruggelezen. De grotere USB-responsen werken nu met een TX-buffer van 4096 bytes.
+0.4.3 was installed over USB and esptool verified the written flash hash. The same USB connection then reported running version, expected image hash, VALID state and a passing display/touch startup self-check. Larger USB responses now work with a 4096-byte TX buffer.
 
-Op het echte apparaat is via de gedeelde UI-handler gecontroleerd: korte tik omhoog kiest 75 cm, vasthouden koos daarna 80 cm, release hield het doel stabiel, één tik omlaag koos 79 cm, en de huidige hoogte bleef bij al die stappen 74 cm. Annuleren bracht het beginscherm terug. De firmware rapporteert min 620 en max 1270 mm. Endpointgedrag en bewegen tot de grens zijn afgedekt door de geslaagde native regressietest; er is tijdens deze eindcontrole geen automatische bewegingsdemo gestart.
+On the actual device, the shared UI handler verified: a short up tap selected 75 cm, holding then selected 80 cm, release kept the target stable, one down tap selected 79 cm, and current height remained 74 cm throughout. Annuleren returned to the home screen. Firmware reports min 620 and max 1270 mm. Endpoint behavior and movement to the limit are covered by the passing native regression test; no automatic movement demo was started during this final check.
 
-Bewijs staat lokaal in `artifacts/display-0.4.3/verification.json` en de USB-installatielog. De volledige suite van 46 tests, lint en formattering zijn geslaagd voor deze release. Fysieke gebruikersbeoordeling van look-and-feel en touch blijft de volgende stap.
+Evidence is stored locally in `artifacts/display-0.4.3/verification.json` and the USB installation log. The full 46-test suite, lint and formatting passed for this release. Physical user assessment of look and feel and touch remains the next step.
 
 
-De atomische framebuffer-API vanaf 0.5.0 maakt bij offset nul één kopie in PSRAM en geeft iedere chunk dezelfde `snapshot_id` en `snapshot_screen`. Gelijktijdige bediening of automatisch dimmen kan die opname niet meer vermengen. De browserkopie houdt voorlopig de vorige ontwerpset; deze 17-schermenuitwerking is de native displaydemo.
+The atomic framebuffer API since 0.5.0 makes one PSRAM copy at offset zero and gives every chunk the same `snapshot_id` and `snapshot_screen`. Concurrent operation or automatic dimming can no longer mix that capture. The browser copy retains the previous design set for now; this 17-screen implementation is the native display demo.
 
-## Alleen-lezen status in 0.7.0
+## Read-only status in 0.7.0
 
-Een nieuwe webserver-adapter kan werkelijke bureau- en monitorstatus sturen met capability `device.state.v1`; zie `production-protocol.md`. Er is geen Dell-afhankelijkheid: alleen een Waveshare, of een bureau zonder monitor, wordt ondersteund. De host bepaalt één geselecteerde monitor; onbekende of oude waarden worden expliciet aangegeven. In deze modus veranderen tikken/hold/release geen hoogte en starten ze geen simulatie. Bedieningscommando’s volgen later.
+A new webserver adapter can send actual desk and monitor status with capability `device.state.v1`; see `production-protocol.md`. There is no Dell dependency: a Waveshare alone or a desk without a monitor is supported. The host selects one monitor; unknown or old values are explicitly indicated. In this mode, tap/hold/release does not change height or start simulation. Control commands follow later.
 
-Native C++-tests dekken atomische validatie, data-expiry, onbekende status en geblokkeerde touch. De native schermen zijn visueel gecontroleerd; dit is geen hardware-/NetLink-acceptatie. Laatst fysiek gecontroleerde firmware blijft 0.6.0; 0.7.0 is nog niet geïnstalleerd.
+Native C++ tests cover atomic validation, data expiry, unknown status and blocked touch. Native screens were visually checked; this is not hardware/NetLink acceptance. The latest physically verified firmware remains 0.6.0; 0.7.0 has not been installed yet.

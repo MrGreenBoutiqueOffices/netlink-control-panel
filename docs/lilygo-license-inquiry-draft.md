@@ -1,6 +1,6 @@
-# Conceptvraag aan LILYGO — nog niet verstuurd
+# Draft inquiry to LILYGO — not sent
 
-Doelrepository: `Xinyuan-LilyGO/T-Display-S3-Long`. De vraag hieronder is gereed voor een openbare GitHub-issue. Er is nog geen bericht namens het bedrijf geplaatst.
+Target repository: `Xinyuan-LilyGO/T-Display-S3-Long`. The inquiry below is ready for a public GitHub issue. No message has been posted on behalf of the company.
 
 ## Title
 

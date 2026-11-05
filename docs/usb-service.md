@@ -1,69 +1,69 @@
-# USB panel-service
+# USB panel service
 
-De service in deze repository vervangt voor discovery, enrollment en statusbewaking het Mac-benchprogramma. Hij draait op Linux zonder wifi of internet en bewaakt één expliciet gekoppeld paneel. Hij publiceert alleen lokale geschoonde status; MQTT-actuatie, agentintegratie, firmwaretransfer en een HTTP-beheerinterface zijn nog niet aanwezig.
+The service in this repository replaces the Mac bench program for discovery, enrollment and status monitoring. It runs on Linux without Wi-Fi or internet and monitors one explicitly enrolled panel. It publishes only local sanitized status; MQTT actuation, agent integration, firmware transfer and an HTTP management interface are not present yet.
 
-Voorwaarde is firmware 0.6.0 met [protocol v2](production-protocol.md). Een paneel met de eerder geïnstalleerde 0.5.2 krijgt geen geslaagde productiehandshake. De firmware is inmiddels afzonderlijk via USB op het prototype geïnstalleerd en met de service getest; de procedure hieronder installeert niets automatisch. De bestaande v1-tools blijven bruikbaar wanneer er geen actieve v2-sessie is.
+Firmware 0.6.0 with [protocol v2](production-protocol.md) is required. A panel with the previously installed 0.5.2 cannot complete a production handshake. Firmware has since been installed separately over USB on the prototype and tested with the service; the procedure below installs nothing automatically. Existing v1 tools remain usable when no v2 session is active.
 
-## Lokaal starten
+## Start locally
 
 ```sh
 uv sync --locked
 uv run panel ports
 uv run panel-service --enrollment .secrets/service-enrollment.json enroll \
-  --port <huidige-usb-poort> \
-  --panel-id <bewust-gecontroleerde-paneelidentiteit> \
-  --usb-serial <seriecode-uit-usb-inventaris> \
+  --port <current-usb-port> \
+  --panel-id <verified-panel-identity> \
+  --usb-serial <serial-from-usb-inventory> \
   --board-revision unverified
 uv run panel-service --enrollment .secrets/service-enrollment.json run --status .secrets/service-status.json
 ```
 
-Gebruik `unverified` alleen zolang de firmware die revisie expliciet rapporteert. Dit is geen bewijs van de PCB-revisie; registreer de werkelijke hardware bij fysieke commissioning vóór een pilot. Een ondersteund boardprofiel is nog geen acceptatie van alle boards met dezelfde USB-chip.
+Use `unverified` only while firmware explicitly reports that revision. This is not evidence of the PCB revision; record actual hardware during physical commissioning before a pilot. A supported board profile does not establish acceptance of every board with the same USB chip.
 
-Enrollment is bewust: het commando vereist de verwachte paneelidentiteit en USB-seriecode, controleert VID/PID en de actuele poort, voert de v2-handshake uit en schrijft pas daarna de koppeling. Er wordt niet gescand naar een willekeurig paneel om dat automatisch te vertrouwen. Bestaande enrollment wordt nooit overschreven. Stop de service en verwijder de oude enrollment bewust bij een vervanging; identificeer daarna het nieuwe paneel opnieuw.
+Enrollment is deliberate: the command requires expected panel identity and USB serial, checks VID/PID and the current port, performs the v2 handshake and only then writes enrollment. It does not scan for an arbitrary panel to trust automatically. Existing enrollment is never overwritten. For a replacement, stop the service and deliberately remove the old enrollment; then identify the new panel again.
 
-Een bestandlock voorkomt gelijktijdig enrollen/draaien op dezelfde configuratie. De serial-port wordt exclusief geopend. Configuratie en status worden atomisch met mode 0600 geschreven. De lock-directory en enrollment zijn lokaal beheerd; geef onbevoegden geen schrijfrecht. Eén installatie gebruikt één enrollmentpad; maak geen parallelle beheerders met eigen configpaden.
+A file lock prevents simultaneous enrollment/running with the same configuration. The serial port is opened exclusively. Configuration and status are written atomically with mode 0600. The lock directory and enrollment are locally managed; do not grant unauthorized users write access. One installation uses one enrollment path; do not create parallel managers with separate configuration paths.
 
-## Status en lifecycle
+## Status and lifecycle
 
 ```sh
 uv run panel-service status --status .secrets/service-status.json
 ```
 
-Exitcode 0 betekent een niet-verlopen verbonden status; 1 betekent afwezig, stale, gestopt of een lees-/configuratiefout. Het statuscommando opent het paneel niet en heeft geen service-lock nodig.
+Exit code 0 means unexpired connected status; 1 means absent, stale, stopped or a read/configuration error. The status command does not open the panel and needs no service lock.
 
-`waiting` betekent dat discovery bezig is; `connected` volgt pas na gepinde handshake én actuele volledige snapshot. Een fout verwijdert bruikbare paneel-/apparaatstatus en geeft een vaste foutcode. Consumers moeten altijd de snapshotlease controleren; alleen het woord `connected` in een oud bestand is onvoldoende. `panel-service status` doet die controle ook als het serviceproces niet meer draait.
+`waiting` means discovery is in progress; `connected` follows only after a pinned handshake and a fresh full snapshot. An error removes usable panel/device status and reports a fixed error code. Consumers must always check the snapshot lease; the word `connected` in an old file is insufficient. `panel-service status` checks this even when the service process is no longer running.
 
-Requests en heartbeats zijn begrensd; discovery/reconnect heeft een backoff van 1 tot maximaal 15 seconden. Een ontbrekend paneel blijft in discovery. Re-enumeratie op een andere tty-naam is toegestaan als de gepinde USB-identiteit klopt. Elke geopende verbinding krijgt een nieuwe nonce en lege pending toestand, en vraagt een full snapshot. Na SIGTERM/SIGINT sluit de service de port en publiceert `stopped`; een geblokkeerde serial-read duurt maximaal 100 ms. De firmware laat een niet meer gevoede sessie binnen 3,5 seconden verlopen.
+Requests and heartbeats are bounded; discovery/reconnect backs off from 1 to at most 15 seconds. A missing panel stays in discovery. Re-enumeration under another tty name is allowed when the pinned USB identity matches. Each opened connection gets a new nonce, empty pending state and a full snapshot request. On SIGTERM/SIGINT the service closes the port and publishes `stopped`; a blocked serial read lasts at most 100 ms. Firmware expires a session with no renewed liveness within 3.5 seconds.
 
-Er is geen commandowachtrij en geen retry van echte acties. Er wordt niets geflasht. Een gewone USB-open kan door de native USB-driver wel een reset veroorzaken. Laat niet tegelijk bench-/capture-/flashprogramma's op hetzelfde paneel draaien.
+There is no command queue and no retry of real actions. Nothing is flashed. A normal USB open can still trigger a reset through the native USB driver. Do not run bench/capture/flash programs against the same panel simultaneously.
 
-## Linux-container
+## Linux container
 
 ```sh
 docker build -t netlink-panel-service:0.6.0 .
 ```
 
-[Het composevoorbeeld](../deploy/compose.usb.example.yml) is een los USB-only voorbeeld, geen fleetdeployment. Stel `PANEL_SERIAL_GID` in op de numerieke groep van het host-ttyACM-device. De image draait als UID/GID 65532, met alleen die aanvullende groep, zonder capabilities, zonder netwerk en met een read-only rootfilesystem. Alleen `/data` is schrijfbare persistente opslag. Een volume dat enrollment/status tussen recreaties bewaart is verplicht.
+[The compose example](../deploy/compose.usb.example.yml) is a standalone USB-only example, not a fleet deployment. Set `PANEL_SERIAL_GID` to the numeric group of the host ttyACM device. The image runs as UID/GID 65532, with only that supplementary group, no capabilities, no network and a read-only root filesystem. Only `/data` is writable persistent storage. A volume preserving enrollment/status across recreations is required.
 
 ```sh
-export PANEL_SERIAL_GID=<numerieke-device-groep>
+export PANEL_SERIAL_GID=<numeric-device-group>
 docker compose -f deploy/compose.usb.example.yml run --rm panel enroll \
-  --port <linux-ttyACM-poort> --panel-id <paneelidentiteit> \
-  --usb-serial <usb-seriecode> --board-revision unverified
+  --port <linux-ttyACM-port> --panel-id <panel-identity> \
+  --usb-serial <usb-serial> --board-revision unverified
 docker compose -f deploy/compose.usb.example.yml up -d
 ```
 
-Het voorbeeld maakt host-`/dev` alleen-lezen zichtbaar om nieuwe ttyACM-namen na hotplug te kunnen ontdekken. Een device-cgroupregel staat uitsluitend lezen/schrijven van USB-CDC-ACM major 166 toe; er is geen `privileged`, blockdevice-, raw-USB-, GPIO- of UART-toegang nodig. DAC/groepsrechten en enrollment beperken verder welke poort gebruikt wordt. Het proces kan wel device-namen zien; het kernelrecht bestrijkt alle ttyACM-minors, omdat een gereserveerd minor niet stabiel blijft na herstart/hotplug. Een vast `devices:`-inode mounten is strikter maar overleeft re-enumeratie niet betrouwbaar. Als een fleet die dynamische cgroupregel/mount niet ondersteunt, moet de hostintegratie devices gericht doorgeven en de container na een gewijzigde enumeratie recreëren; beweer dan geen transparant hotplugherstel.
+The example exposes host `/dev` read-only to discover new ttyACM names after hotplug. A device-cgroup rule allows only read/write of USB-CDC-ACM major 166; no `privileged`, block-device, raw-USB, GPIO or UART access is needed. DAC/group permissions and enrollment further limit which port is used. The process can see device names; kernel permission covers all ttyACM minors because a reserved minor is not stable across restart/hotplug. Mounting a fixed `devices:` inode is stricter but does not reliably survive re-enumeration. If a fleet does not support that dynamic cgroup rule/mount, host integration must pass specific devices and recreate the container after enumeration changes; do not claim transparent hotplug recovery in that case.
 
-Gebruik het voorbeeld op een cgroup-/Docker-host die de toegangsregel afdwingt; test die eigenschap op de doel-NetLink. Een andere USB-chip/drivermajor vereist een expliciet beoordeelde configuratie, geen bredere wildcard. `/sys/class/tty` en bijbehorende USB-identiteitsmetadata moeten read-only beschikbaar zijn voor pyserial discovery. Er is geen toegang tot het bureau-UART of DDC nodig.
+Use the example on a cgroup/Docker host that enforces the access rule; test this on the target NetLink. A different USB chip/driver major requires an explicitly reviewed configuration, not a broader wildcard. `/sys/class/tty` and associated USB identity metadata must be available read-only for pyserial discovery. No access to the desk UART or DDC is needed.
 
-## NetLink-integratie en fysieke gate
+## NetLink integration and physical gate
 
-De service hoort later als eigen image/block in de bestaande fleet-first Balena-stack. Deze PR wijzigt geen `netlink_balena`-compose, bestaande submodulepointer of fleet. De panel-service wordt geen tweede agent: agenthealth, desired state en remote autorisatie zijn aparte issues.
+The service is intended to become its own image/block in the existing fleet-first Balena stack. This PR changes no `netlink_balena` compose file, existing submodule pointer or fleet. The panel service will not be a second agent: agent health, desired state and remote authorization are separate issues.
 
-Begin met een vrije USB-datahostpoort van de bedoelde NetLink, gescheiden van het bureau-UART-pad. Gebruik geen voeding-only kabel. Het werkelijke voedingsbudget, beschikbare poort en gedrag bij inpluggen/reboot moeten op die hardware worden gemeten en geregistreerd; het Mac-prototype bewijst dat niet. Als USB-voeding tekortschiet moet de oplossing expliciet worden gevalideerd; geen stille afhankelijkheid van wifi of ongeteste hub.
+Start with a free USB data host port on the intended NetLink, separate from the desk UART path. Do not use a power-only cable. Actual power budget, available port and plug-in/reboot behavior must be measured and recorded on that hardware; the Mac prototype does not prove them. If USB power is insufficient, the solution must be explicitly validated; no silent dependency on Wi-Fi or an untested hub.
 
-Nog fysiek te bewijzen op de doel-NetLink (issues #9 en #24): voeding, juiste port/group/cgroup-toegang, identificatie, enrollen, de container lifecycle en hotplug/reboot met nieuwe tty-naam. De test moet aantonen dat bureau- en monitorservices ongestoord blijven. De bestaande pseudoterminaltests bewijzen het servicepad en de nieuwe handshake, niet de fysieke Linux-device/permissie- of voedingslaag.
+Still to prove physically on the target NetLink (issues #9 and #24): power, correct port/group/cgroup access, identification, enrollment, container lifecycle and hotplug/reboot with a new tty name. The test must show desk and monitor services remain unaffected. Existing pseudo-terminal tests prove the service path and new handshake, not the physical Linux device/permissions or power layer.
 
 ## Checks
 
@@ -74,16 +74,16 @@ uv tool run --from ruff ruff format --check .
 uv tool run --from platformio==6.1.18 pio run --project-dir firmware
 ```
 
-De firmwarebuild moet eerst één keer gedaan zijn om de gepinde ArduinoJson-headers voor de native protocoltests beschikbaar te maken. Tests gebruiken eigen pseudoterminals en schrijven niet naar het echte paneel.
+Build the firmware once first so the pinned ArduinoJson headers are available for native protocol tests. Tests use their own pseudo-terminals and do not write to the real panel.
 
-## Fysieke USB-proef op de Mac — 4 november 2026
+## Physical USB trial on the Mac — 4 November 2026
 
-Firmware 0.6.0 uit broncommit `684205f` is na controle van USB-identiteit, fabrieksbackup en actieve slot app-only via USB geschreven. Esptool verifieerde de flashhash. Daarna bevestigde de v1-hello de verwachte imagehash, versie 0.6.0, VALID en geslaagde startup-self-check.
+Firmware 0.6.0 from source commit `684205f` was written app-only over USB after checking USB identity, factory backup and active slot. Esptool verified the flash hash. The v1 hello then confirmed the expected image hash, version 0.6.0, VALID and a passing startup self-check.
 
-Op hetzelfde fysieke paneel slaagden de v2-handshake, boardprofiel-/identiteitscontrole, snapshots met revisies 1/2/3 en het afwijzen van niet-ondersteunde acties. De gerapporteerde boardrevisie blijft bewust `unverified`; bureau en monitor bleven onbekend. Er zijn geen UI-acties geïnjecteerd of echte apparaatcommando’s verstuurd.
+On the same physical panel, the v2 handshake, board-profile/identity checks, snapshots with revisions 1/2/3 and rejection of unsupported actions passed. The reported board revision deliberately remains `unverified`; desk and monitor remained unknown. No UI actions were injected or real device commands sent.
 
-De eerste directe overgang na een v1-hello leverde terecht `busy`: een open USB-client sluiten beëindigt de applicatiesessie niet meteen. Na de 3,5-seconden-livenessgrens slaagde v2. Wacht bij handmatige enrollment na het stoppen van een benchclient minimaal vier seconden; de daemon probeert bij busy zelf opnieuw met backoff. Dit vereist geen firmwarewijziging.
+The first immediate transition after a v1 hello correctly returned `busy`: closing an open USB client does not end the application session immediately. V2 passed after the 3.5-second liveness boundary. For manual enrollment, wait at least four seconds after stopping a bench client; the daemon automatically retries busy responses with backoff. This requires no firmware change.
 
-De echte CLI-enrollment slaagde, schreef mode 0600 en weigerde overschrijven. Een serviceproef van 15 seconden leverde 14 verschillende actuele revisies; na nette stop en herstart volgden opnieuw revisie 1 en vijf actuele revisies in vijf seconden. Een tweede gelijktijdige service werd in beide proeven geweigerd. SIGTERM sloot de service en publiceerde `stopped`. Na een afzonderlijke geforceerde hostprocesstop (SIGKILL) werd de oude snapshot na vier seconden als stale zonder bruikbare status gelezen. Een nieuwe service begon opnieuw bij revisie 1 en is na de controle netjes gestopt.
+Actual CLI enrollment succeeded, wrote mode 0600 and refused overwrites. A 15-second service trial produced 14 different fresh revisions; after a clean stop and restart it again produced revision 1 and five fresh revisions in five seconds. A second simultaneous service was rejected in both trials. SIGTERM closed the service and published `stopped`. After a separate forced host-process termination (SIGKILL), the old snapshot was read as stale without usable status after four seconds. A new service restarted at revision 1 and was stopped cleanly after verification.
 
-Dit bewijst USB-communicatie met het display vanaf macOS. Het is geen fysieke kabel-hotplug, stroomuitval-, duur- of doel-NetLink-permissietest. Het lokale bewijs staat onder `artifacts/display-0.6.0/verification.json` (bewust buiten Git); de bijbehorende image en manifest staan onder `artifacts/releases/`.
+This proves USB communication with the display from macOS. It is not a physical cable-hotplug, power-failure, endurance or target-NetLink permissions test. Local evidence is under `artifacts/display-0.6.0/verification.json` (deliberately outside Git); the corresponding image and manifest are under `artifacts/releases/`.

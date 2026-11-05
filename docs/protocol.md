@@ -1,6 +1,6 @@
 # Bench protocol v1
 
-Voor het productiecontract en de nieuwe USB-service: [protocol v2](production-protocol.md) en [USB panel-service](usb-service.md). Dit document beschrijft de oudere benchinterface.
+For the production contract and new USB service, see [protocol v2](production-protocol.md) and the [USB panel service](usb-service.md). This document describes the older bench interface.
 
 This is a diagnostic prototype, not the final NetLink command contract. No desk or monitor action is executable. USB and Wi-Fi share these application messages. The panel is the TLS-PSK client; the Mac bench tool is the server. See [Wi-Fi setup](wifi.md).
 
