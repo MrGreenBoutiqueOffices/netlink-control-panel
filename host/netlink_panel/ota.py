@@ -171,8 +171,12 @@ def check_hello(hello, pairing, manifest):
     return ota
 
 
-def upload(peer, data, manifest, *, allow_resume=False, progress=None):
-    response = peer.request("ota_begin", **manifest)
+def upload(peer, data, manifest, *, allow_resume=False, progress=None, authorization=None):
+    response = (
+        peer.request("ota_begin_signed", **authorization)
+        if authorization is not None
+        else peer.request("ota_begin", **manifest)
+    )
     start = response.get("next_offset")
     if type(start) is not int or start < 0 or start > len(data) or (start != len(data) and start % CHUNK_SIZE):
         raise OTAError("Panel returned an invalid resume offset")
@@ -233,6 +237,20 @@ def update(args):
 
     if not 10 <= args.timeout <= 3600:
         raise OTAError("Update timeout must be 10..3600 seconds")
+    authorization = None
+    bundle = getattr(args, "release_bundle", None)
+    trust_path = getattr(args, "trusted_keys", None)
+    board_revision = getattr(args, "board_revision", None)
+    if bundle is not None:
+        from .signed_updates import load_trust, verify_bundle
+
+        if not trust_path or not board_revision:
+            raise OTAError("Signed bundle requires --trusted-keys and --board-revision")
+        authorization = json.loads((bundle / "authorization.json").read_bytes())
+        verify_bundle(bundle, authorization, load_trust(trust_path), board_revision=board_revision)
+        args.firmware = bundle / "firmware.bin"
+    elif trust_path or board_revision:
+        raise OTAError("--trusted-keys and --board-revision require --release-bundle")
     if args.firmware.stat().st_size > SLOT_SIZE:
         raise OTAError("Firmware exceeds the application slot")
     data = args.firmware.read_bytes()
@@ -327,6 +345,15 @@ def update(args):
                             continue
                         raise
                     ota = check_hello(hello, pairing, manifest)
+                    if authorization is not None:
+                        if (
+                            ota.get("signed_required") is not True
+                            or ota.get("authorization") != "ecdsa-p256-sha256-v1"
+                            or ota.get("board_revision") != board_revision
+                        ):
+                            raise OTAError("Panel does not match the pinned signed-update policy")
+                    elif ota.get("signed_required") is True:
+                        raise OTAError("Panel requires an authenticated release bundle")
                     session_count += 1
                     sample = {
                         **peer_diagnostics(hello),
@@ -370,7 +397,14 @@ def update(args):
                     resumable = "ota_resume_v1" in hello["capabilities"]
                     phase = "transfer"
                     try:
-                        upload(peer, data, manifest, allow_resume=resumable, progress=budget.advance)
+                        upload(
+                            peer,
+                            data,
+                            manifest,
+                            allow_resume=resumable,
+                            progress=budget.advance,
+                            authorization=authorization,
+                        )
                         recovering_transfer = False
                     except (OSError, TimeoutError) as error:
                         if resumable and time.monotonic() < deadline:

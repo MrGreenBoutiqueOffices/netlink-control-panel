@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import io
 import json
+import os
 import re
 import subprocess
 import tarfile
@@ -119,7 +120,11 @@ def package(root, firmware, output, commit, tag=None, notes=None):
         "firmware/src/demo_assets.cpp",
         "scripts/prepare_firmware.py",
         "release/protocol-core.json",
+        "release/update-trust.json",
     ]
+    board_revision = os.environ.get("PANEL_BOARD_REVISION", "unverified")
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{1,32}", board_revision):
+        raise ValueError("Invalid board revision")
     manifest = {
         "schema": 1,
         "source": {"repository": "MrGreenBoutiqueOffices/netlink-control-panel", "commit": commit, "tag": tag},
@@ -128,7 +133,7 @@ def package(root, firmware, output, commit, tag=None, notes=None):
             "protocol_min": 2,
             "protocol_max": 2,
             "board_profile": "lilygo-s3-long-cst3530",
-            "board_revision": "unverified",
+            "board_revision": board_revision,
             "partition_layout": "ota3m-v1",
             "actions": [],
             "protocol_core_version": core_manifest["version"],
@@ -138,7 +143,7 @@ def package(root, firmware, output, commit, tag=None, notes=None):
         "artifacts": {name: {"sha256": digest(data), "size": len(data)} for name, data in files.items()},
         "signature": {
             "status": "unsigned",
-            "reason": "Release-key provisioning and firmware verifier remain issue #15",
+            "reason": "No release signing key configured; bench artifact",
         },
     }
     files["manifest.json"] = json_bytes(manifest)

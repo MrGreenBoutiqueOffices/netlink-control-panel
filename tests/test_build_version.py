@@ -2,6 +2,7 @@
 
 import os
 import runpy
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -14,11 +15,18 @@ class BuildVersionTests(unittest.TestCase):
         class Environment:
             defines = None
 
+            def __getitem__(self, key):
+                return str(ROOT / "firmware")
+
+            def subst(self, value):
+                return temporary
+
             def Append(self, **kwargs):
-                self.defines = kwargs["CPPDEFINES"]
+                if "CPPDEFINES" in kwargs:
+                    self.defines = kwargs["CPPDEFINES"]
 
         environment = Environment()
-        with patch.dict(os.environ, {"PANEL_RELEASE_VERSION": version}):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"PANEL_RELEASE_VERSION": version}):
             runpy.run_path(
                 str(ROOT / "firmware/release_version.py"), init_globals={"env": environment, "Import": lambda _: None}
             )

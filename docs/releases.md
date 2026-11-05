@@ -31,6 +31,7 @@ uv run --locked yamllint .github .yamllint
 node --check preview/app.js
 uv run --locked python scripts/generate_demo_assets.py --check
 uv run --locked python scripts/prepare_firmware.py
+uv run --locked python scripts/prepare_crypto_tests.py
 uv run --locked pio run --project-dir firmware
 uv run --locked python scripts/check_tests.py
 uv run --locked python scripts/release_artifacts.py --output artifacts/candidate
@@ -46,6 +47,7 @@ De uitvoermap moet leeg zijn; de packaging-CLI weigert wijzigingen aan tracked b
 | `manifest.json` | Bronrepo/commit/tag, firmwareversie, bestand- en imagehash, profiel/slotlimiet, protocol-/boardcompatibiliteit, inputdigests, artifactdigests en ondertekeningsstatus |
 | `protocol-core.tar.gz` | Afgebakende versie van `protocol.py` en geselecteerde transportonafhankelijke hostsymbolen, met provenance/digests |
 | `RELEASE_NOTES.md` | Bij een release: de Release Drafter-body van de bestaande gepubliceerde release; bij PR/main: een CI-candidatemelding |
+| `authorization.json` | Alleen bij signed releases: afzonderlijke ECDSA P-256-autorisatierecord en handtekening |
 | `SHA256SUMS` | SHA-256 van alle voorgaande bestanden, inclusief het manifest |
 
 De ESP-imageheader, segmentchecksums, appended imagehash en board-/partitiemarker worden gecontroleerd. Zonder release moeten image, projectversie en fallbackheader overeenkomen. Bij een gepubliceerde release is de gevalideerde tag `v<semver>` leidend: dezelfde versie wordt via een compilerdefine in scherm, handshake en image-marker verwerkt en moet in de gebouwde image terugkomen. De bronbestanden worden niet herschreven. De releasenotities komen uit GitHub; er is geen aparte handmatige changelog of verplichte versiecommit per release. Losse artifacts kunnen met `sha256sum --check SHA256SUMS` op overdrachtscorruptie worden gecontroleerd.
@@ -62,12 +64,12 @@ Dit is een test van het protocolpakket en het vastgelegde consumercontract, geen
 
 ## Release Drafter en release-assets
 
-`release-drafter.yaml` gebruikt dezelfde minimale job als `python-balena-cloud`: één Release Drafter-actie op main of een handmatige run, met de geërfde centrale categorieën en versie-resolver. Er is geen checkout, eigen versie-initialisatie of lokale kopie van de configuratie. Omdat deze repository nog geen gepubliceerde release heeft, moet de maintainer bij de eerste draft de gewenste startversie controleren; voor voortzetting van de huidige firmwarelijn is dat v0.8.0. Daarna volgt de versie de bestaande releasehistorie en PR-labels.
+`release-drafter.yaml` gebruikt dezelfde minimale job als `python-balena-cloud`: één Release Drafter-actie op main of een handmatige run, met de geërfde centrale categorieën en versie-resolver. Er is geen checkout, eigen versie-initialisatie of lokale kopie van de configuratie. v0.8.0 is gepubliceerd; volgende drafts volgen de bestaande releasehistorie en PR-labels. Controleer vóór publicatie de voorgestelde versie en notities.
 
 De maintainer controleert en publiceert de draft in GitHub. `release.yaml` start op `release.published`, zoals de package-releaseworkflow. De releasejob draait in de `release`-environment en checkt de **exacte releasetag** uit. Hij valideert main-ancestry en de versie, stelt de firmwareversie voor de build in, bouwt de image en draait de host/native tests. Er is geen tweede publicatie-/uploadjob en er is geen artifactoverdracht tussen workflows nodig.
 
-De releasebody uit het publicatie-event wordt als `RELEASE_NOTES.md` meegenomen. De job verpakt de image, controleert `SHA256SUMS` en uploadt de vijf bestanden met `svenstaro/upload-release-action` naar de bestaande release-ID. De bestaande Release Drafter-titel en -body blijven behouden. Assets worden niet overschreven; dubbele namen laten de upload falen. Bij een gedeeltelijk mislukte upload blijven mogelijk assets staan; controleer die vóór een nieuwe poging. Een release heeft pas bruikbare firmware-assets als de releasejob geslaagd is. PR-/testworkflows maken geen tags of releases aan.
+De releasebody uit het publicatie-event wordt als `RELEASE_NOTES.md` meegenomen. De job verpakt de image, controleert `SHA256SUMS` en uploadt de vijf bench-assets of zes signed assets met `svenstaro/upload-release-action` naar de bestaande release-ID. De bestaande Release Drafter-titel en -body blijven behouden. Assets worden niet overschreven; dubbele namen laten de upload falen. Bij een gedeeltelijk mislukte upload blijven mogelijk assets staan; controleer die vóór een nieuwe poging. Een release heeft pas bruikbare firmware-assets als de releasejob geslaagd is. PR-/testworkflows maken geen tags of releases aan.
 
-De artifacts zijn expliciet **unsigned**. Er is geen signingkey in PR-CI. Ondertekening en verifier/keyprovisioning horen bij #15 en moeten gereed zijn voordat een beheerde updater zulke artifacts als vertrouwd kan installeren. Een Release Drafter-draft, gepubliceerde release of groene CI is geen fysieke installatie, OTA-acceptatie of toestemming voor beweging.
+De standaardpolicy produceert expliciet **unsigned bench-artifacts**. De optionele ondertekening en verificatie op host/paneel staan in [ondertekende updates](signed-updates.md). Een signed release vereist vooraf gereviewde publieke trust, bekende boardrevision en een private secret in environment `release`; bij ontbrekende of ongeldige configuratie faalt de job. PR-CI gebruikt uitsluitend tijdelijke testsleutels. Productiekeyprovisioning en de beheerde webserver-lifecycle blijven binnen #15 open. Een Release Drafter-draft, gepubliceerde release of groene CI is geen fysieke installatie, OTA-acceptatie of toestemming voor beweging.
 
 De bestaande fleet-first route blijft leidend: een reviewbare consumerpin gaat via de webserver-image naar NetLink develop/dev, acceptance en stable production. Alleen de agent/webserverrollen uit de bestaande architectuur worden gebruikt; er is geen rechtstreeks firmwaredeploy vanuit deze workflow. Artifactadoptie in de webserver en die rolloutacceptatie blijven open binnen #23/#15, naast de afzonderlijke hardware-/OTA-issues.

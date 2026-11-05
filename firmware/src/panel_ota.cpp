@@ -21,6 +21,27 @@ static void hexDigest(const uint8_t *digest, char *output) {
   output[64] = 0;
 }
 
+static bool decodeBounded(const char *text, uint8_t *out, size_t capacity, size_t &length) {
+  if (!text) return false;
+  size_t n = strlen(text);
+  if (!n || n % 4 || n > ((capacity+2)/3)*4) return false;
+  const char *alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  length=0;
+  for (size_t i=0;i<n;i+=4) {
+    unsigned value=0; int padding=0;
+    for (size_t j=0;j<4;j++) {
+      char c=text[i+j];
+      if (c=='=') { if (i+4!=n || j<2) return false; padding++; value<<=6; }
+      else { const char *p=strchr(alphabet,c); if (!c || !p || padding) return false; value=(value<<6)|(p-alphabet); }
+    }
+    if (padding>2 || (padding==2 && (value&0xffff)) || (padding==1 && (value&0xff))) return false;
+    size_t count=3-padding;
+    if (length+count>capacity) return false;
+    for (size_t j=0;j<count;j++) out[length++]=(value>>(16-8*j))&255;
+  }
+  return true;
+}
+
 static bool validDigest(JsonVariant value) {
   if (!value.is<const char *>() || strlen(value.as<const char *>()) != 64) return false;
   for (const char *c = value.as<const char *>(); *c; c++)
@@ -55,6 +76,9 @@ void PanelOta::bootStart() {
 void PanelOta::describe(JsonObject result) {
   esp_ota_img_states_t state;
   bool valid = esp_ota_get_state_partition(esp_ota_get_running_partition(), &state) == ESP_OK && state == ESP_OTA_IMG_VALID;
+  result["signed_required"] = policy.signedOnly;
+  result["board_revision"] = policy.boardRevision;
+  result["authorization"] = policy.signedOnly ? "ecdsa-p256-sha256-v1" : "bench_unsigned";
   result["supported"] = supported;
   result["profile"] = PANEL_OTA_PROFILE;
   result["image_sha256"] = runningSha;
@@ -90,6 +114,9 @@ void PanelOta::handle(JsonDocument &message, JsonDocument &response, bool health
   response["type"] = "ack"; response["id"] = message["id"]; response["ok"] = false;
   const char *type = message["type"];
   if (!supported || committed()) { response["error"] = "ota_unavailable"; return; }
+  if (!strcmp(type, "ota_policy")) {
+    response["ok"] = true; response["build_identity"] = buildIdentity; return;
+  }
   if (!strcmp(type, "ota_confirm")) {
     if (receiving() || !healthy || !validDigest(message["image_sha256"]) || strcmp(message["image_sha256"], runningSha)) {
       response["error"] = "boot_check_failed"; return;
@@ -100,45 +127,27 @@ void PanelOta::handle(JsonDocument &message, JsonDocument &response, bool health
     return;
   }
   if (!strcmp(type, "ota_abort")) { abort(); response["ok"] = true; return; }
-  if (!strcmp(type, "ota_begin")) {
-    if (pendingBoot || !healthy) { response["error"] = "ota_busy_or_unhealthy"; return; }
-    if (!message["size"].is<uint32_t>() || !validDigest(message["sha256"]) || !validDigest(message["image_sha256"]) ||
-        !message["profile"].is<const char *>() || strcmp(message["profile"], PANEL_OTA_PROFILE) || !message["version"].is<const char *>()) {
-      response["error"] = "invalid_manifest"; return;
+  UpdateAuthorization authorization = {};
+  bool signedBegin = !strcmp(type, "ota_begin_signed");
+  if (signedBegin) {
+    uint8_t record[340], signature[72]; size_t recordLength=0, signatureLength=0;
+    if (!message["authorization"].is<const char *>() || !message["signature"].is<const char *>() ||
+        !decodeBounded(message["authorization"],record,sizeof(record),recordLength) ||
+        !decodeBounded(message["signature"],signature,sizeof(signature),signatureLength) ||
+        !verifyUpdate(record,recordLength,signature,signatureLength,policy,authorization)) {
+      response["error"]="invalid_authorization"; return;
     }
-    const char *version = message["version"];
-    if (!strlen(version) || strlen(version) > 31) { response["error"] = "invalid_version"; return; }
-    for (const char *c = version; *c; c++)
-      if (!isalnum(static_cast<unsigned char>(*c)) && *c != '.' && *c != '_' && *c != '-') { response["error"] = "invalid_version"; return; }
-    char requestedMarker[160];
-    snprintf(requestedMarker, sizeof(requestedMarker), "NETLINK_PANEL_IMAGE_V1|" PANEL_OTA_PROFILE "|v%s;", version);
-    if (receiving()) {
-      // The flash handle and running hash survive TLS loss, never a reboot.
-      // Do not erase or replace a different in-flight image on reconnect.
-      if (message["size"].as<uint32_t>() != guard.expected || strcmp(message["sha256"], expectedSha) ||
-          strcmp(message["image_sha256"], expectedImageSha) || strcmp(requestedMarker, marker)) {
-        response["error"] = "different_transfer_active"; return;
-      }
-      lastChunk = millis(); response["ok"] = true; response["next_offset"] = guard.offset;
-      return;
+    if (receiving() && (!authorizedTransfer || memcmp(authorizationIdentity,authorization.identity,32))) {
+      response["error"]="different_authorization_active"; return;
     }
-    target = esp_ota_get_next_update_partition(nullptr);
-    uint32_t size = message["size"];
-    if (!target || target == esp_ota_get_running_partition() || size < 288 || size > target->size) {
-      response["error"] = "invalid_image_size"; target = nullptr; return;
-    }
-    if (!anchorRunning() || esp_ota_begin(target, OTA_WITH_SEQUENTIAL_WRITES, &handleId) != ESP_OK) {
-      response["error"] = "flash_begin_failed"; target = nullptr; return;
-    }
-    guard.begin(size, target->size);
-    strlcpy(expectedSha, message["sha256"], sizeof(expectedSha));
-    strlcpy(expectedImageSha, message["image_sha256"], sizeof(expectedImageSha));
-    snprintf(marker, sizeof(marker), "NETLINK_PANEL_IMAGE_V1|" PANEL_OTA_PROFILE "|v%s;", version);
-    markerSeen = false; matchedMarker = 0;
-    mbedtls_sha256_init(&hash); mbedtls_sha256_starts_ret(&hash, 0); hashActive = true;
-    lastChunk = millis(); response["ok"] = true; response["next_offset"] = 0;
+    StaticJsonDocument<512> verifiedMessage;
+    verifiedMessage["size"]=authorization.size; verifiedMessage["sha256"]=authorization.sha256;
+    verifiedMessage["image_sha256"]=authorization.imageSha256; verifiedMessage["version"]=authorization.version;
+    verifiedMessage["profile"]=PANEL_OTA_PROFILE;
+    begin(verifiedMessage,response,healthy,&authorization);
     return;
   }
+  if (!strcmp(type, "ota_begin")) { begin(message,response,healthy,nullptr); return; }
   if (!receiving()) { response["error"] = "no_transfer"; return; }
   if (!strcmp(type, "ota_chunk")) {
     uint8_t chunk[TransferGuard::ChunkSize]; size_t length = 0;
@@ -183,4 +192,47 @@ void PanelOta::handle(JsonDocument &message, JsonDocument &response, bool health
 void PanelOta::tick() {
   if (receiving() && millis() - lastChunk > OtaResumeTimeoutMs) abort();
   if (committed() && millis() - rebootAt > 200) esp_restart();
+}
+
+void PanelOta::begin(JsonDocument &message, JsonDocument &response, bool healthy, const UpdateAuthorization *authorization) {
+  if (!authorization && (policy.signedOnly || (receiving() && authorizedTransfer))) { response["error"]="signature_required"; return; }
+  if (pendingBoot || !healthy) { response["error"] = "ota_busy_or_unhealthy"; return; }
+  if (!message["size"].is<uint32_t>() || !validDigest(message["sha256"]) || !validDigest(message["image_sha256"]) ||
+      !message["profile"].is<const char *>() || strcmp(message["profile"], PANEL_OTA_PROFILE) || !message["version"].is<const char *>()) {
+    response["error"] = "invalid_manifest"; return;
+  }
+  const char *version = message["version"];
+  if (!strlen(version) || strlen(version) > 31) { response["error"] = "invalid_version"; return; }
+  for (const char *c = version; *c; c++)
+    if (!isalnum(static_cast<unsigned char>(*c)) && *c != '.' && *c != '_' && *c != '-') { response["error"] = "invalid_version"; return; }
+  char requestedMarker[160];
+  snprintf(requestedMarker, sizeof(requestedMarker), "NETLINK_PANEL_IMAGE_V1|" PANEL_OTA_PROFILE "|v%s;", version);
+  if (receiving()) {
+    // The flash handle and running hash survive TLS loss, never a reboot.
+    // Do not erase or replace a different in-flight image on reconnect.
+    if (message["size"].as<uint32_t>() != guard.expected || strcmp(message["sha256"], expectedSha) ||
+        strcmp(message["image_sha256"], expectedImageSha) || strcmp(requestedMarker, marker)) {
+      response["error"] = "different_transfer_active"; return;
+    }
+    lastChunk = millis(); response["ok"] = true; response["next_offset"] = guard.offset;
+    return;
+  }
+  target = esp_ota_get_next_update_partition(nullptr);
+  uint32_t size = message["size"];
+  if (!target || target == esp_ota_get_running_partition() || size < 288 || size > target->size) {
+    response["error"] = "invalid_image_size"; target = nullptr; return;
+  }
+  if (!anchorRunning() || esp_ota_begin(target, OTA_WITH_SEQUENTIAL_WRITES, &handleId) != ESP_OK) {
+    response["error"] = "flash_begin_failed"; target = nullptr; return;
+  }
+  guard.begin(size, target->size);
+  authorizedTransfer=authorization != nullptr;
+  if (authorization) memcpy(authorizationIdentity,authorization->identity,32);
+  strlcpy(expectedSha, message["sha256"], sizeof(expectedSha));
+  strlcpy(expectedImageSha, message["image_sha256"], sizeof(expectedImageSha));
+  snprintf(marker, sizeof(marker), "NETLINK_PANEL_IMAGE_V1|" PANEL_OTA_PROFILE "|v%s;", version);
+  markerSeen = false; matchedMarker = 0;
+  mbedtls_sha256_init(&hash); mbedtls_sha256_starts_ret(&hash, 0); hashActive = true;
+  lastChunk = millis(); response["ok"] = true; response["next_offset"] = 0;
+  return;
 }
