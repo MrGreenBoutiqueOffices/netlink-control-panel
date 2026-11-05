@@ -123,3 +123,9 @@ Begin met het protocol en de USB-service; werk parallel aan OTA-diagnose en CI. 
 | `tests/` | Python-, native renderer-, protocol- en hersteltests |
 | `scripts/` | Firmwarevoorbereiding, assetgeneratie en diagnostische captures |
 | `docs/` | Ontwerpen, gebruik, historische testresultaten en planning |
+
+## Licentie
+
+De eigen projectcode is gelicentieerd onder de [GNU General Public License versie 3](LICENSE), SPDX `GPL-3.0-only`. Bij verspreiding van afgeleide software moet de bijbehorende broncode onder dezelfde licentie beschikbaar worden gesteld; commercieel gebruik is toegestaan. Deze keuze draagt auteursrechten niet over.
+
+Onderdelen van derden houden hun eigen licenties en auteursrechtvermeldingen. Inter blijft onder de SIL Open Font License; zie [third-party-vermeldingen](THIRD_PARTY_NOTICES.md). De licentie van de eigen code verklaart de volledige meegebouwde firmware niet automatisch vrij voor distributie. Zie de [voorbereiding van openbaarmaking](docs/open-source-readiness.md) voor de nog open punten.
