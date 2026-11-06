@@ -4,7 +4,7 @@ The panel can check GitHub Releases and install firmware itself over Wi-Fi. A Ma
 
 ## On the panel
 
-Open **Meer → Updates**, tap **Controleren**, inspect the offered version and tap **Installeren**. Checks and installation are manual. The panel uses the latest published stable release from `MrGreenBoutiqueOffices/netlink-control-panel`; drafts and prereleases are excluded. Updates are refused while controls or another transfer are busy.
+Open **Meer → Software**, tap **Controleren**, inspect the offered version and tap **Installeren**. Checks and installation are manual. The panel uses the latest published stable release from `MrGreenBoutiqueOffices/netlink-control-panel`; drafts and prereleases are excluded. Updates are refused while controls or another transfer are busy. **Annuleren** safely stops a download into the inactive slot. The installation/verification screen is not cancellable; activation keeps the existing last-working-image safeguards.
 
 Wi-Fi can be provisioned once through USB without a bench server or pairing file:
 

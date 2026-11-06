@@ -87,7 +87,7 @@ int main(int argc,char **argv) {
   assert(d.scene(13,100));tap(d,550,50,300);assert(d.screen==PanelDemo::Connecting);
   assert(d.scene(13,100));tap(d,550,130,300);assert(d.screen==PanelDemo::Desk);
   assert(d.scene(14,100));assert(d.height==924);tap(d,550,80,300);assert(d.screen==PanelDemo::Desk);
-  assert(!d.scene(-1,100) && !d.scene(17,100));
+  assert(!d.scene(-1,100) && !d.scene(25,100));
   // Production readings are never substituted by a target or a demo preset.
   d=PanelDemo();PanelDeviceState live;live.heightKnown=true;live.heightFresh=true;live.heightMm=1086;
   live.monitorKnown=true;live.monitorFresh=false;live.monitorBrightness=83;
@@ -103,14 +103,21 @@ int main(int argc,char **argv) {
   // Updates are reachable with a tap, including in read-only production mode.
   d=PanelDemo();d.setDeviceState(live);tap(d,420,130,100);tap(d,500,130,300);
   assert(d.screen==PanelDemo::Updates && d.idleForUpdate());
-  tap(d,200,145,500);assert(d.updateAction==PanelDemo::CheckUpdate);
-  d.updateAction=PanelDemo::NoUpdateAction;tap(d,500,145,700);assert(d.updateAction==PanelDemo::NoUpdateAction);
-  d.updateView("Nieuwe firmware beschikbaar","0.9.0",true,0);
-  tap(d,500,145,900);assert(d.updateAction==PanelDemo::InstallUpdate);
+  tap(d,500,145,500);assert(d.updateAction==PanelDemo::CheckUpdate);
+  d.updateAction=PanelDemo::NoUpdateAction;tap(d,500,50,700);assert(d.updateAction==PanelDemo::CheckUpdate);
+  d.updateView("Nieuwe firmware beschikbaar","0.9.0",true,0,PanelUpdateView::Available);
+  tap(d,500,50,900);assert(d.updateAction==PanelDemo::InstallUpdate);
   d.setBusy(true);d.updateAction=PanelDemo::NoUpdateAction;tap(d,50,90,1100);tap(d,200,145,1300);
   assert(d.screen==PanelDemo::Updates && d.updateAction==PanelDemo::NoUpdateAction);
   d.draw(memory+1);assert(memory[0]==0x1234 && memory[640*180+1]==0x5678);
   d.setBusy(false);tap(d,50,90,1500);assert(d.screen==PanelDemo::Menu);
+  d=PanelDemo();assert(d.scene(21,100));d.setBusy(true);
+  tap(d,500,80,200);assert(d.updateAction==PanelDemo::CancelUpdate);
+  d=PanelDemo();assert(d.scene(24,100) && d.profileActive && d.sit==720);
+  tap(d,500,50,200);assert(d.screen==PanelDemo::Confirm && d.target==720 && d.height==740);
+  d=PanelDemo();assert(d.scene(24,100));tap(d,500,130,200);assert(d.screen==PanelDemo::Desk);
+  d=PanelDemo();assert(d.scene(24,100));d.setDeviceState(live);assert(!d.profileActive && d.screen==PanelDemo::Desk);
+  for(int scene=0;scene<25;scene++){d=PanelDemo();assert(d.scene(scene,100));d.draw(memory+1);assert(memory[0]==0x1234 && memory[640*180+1]==0x5678);}
   delete[] memory;
 }
 """

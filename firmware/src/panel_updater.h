@@ -4,6 +4,7 @@
 #include "github_download.h"
 #include "github_release.h"
 #include "update_attempt.h"
+#include "panel_update_view.h"
 
 class PanelUpdater {
  public:
@@ -12,14 +13,18 @@ class PanelUpdater {
   bool check(bool idle,bool wifi);
   bool install(bool idle,bool wifi,bool healthy);
   void tick(bool healthy,bool wifi);
+  bool cancel();
+  bool cancelable() const {return stage==Download && !failedJob;}
+  PanelUpdateView view() const {return presentation;}
   bool busy() const;
   bool available() const { return stage==Ready; }
-  int percent() const { return stage==Download?ota.percent():(stage==Finishing || stage==BootCheck?100:0); }
+  int percent() const { return stage==Download?ota.percent():(stage==Finalizing || stage==Finishing || stage==BootCheck?100:0); }
   const char *status() const { return message; }
   const char *version() const { return authorization.version; }
  private:
-  enum Stage { Idle, Clock, Release, Authorization, Manifest, Ready, Download, Finishing, BootCheck, Failed };
+  enum Stage { Idle, Clock, Release, Authorization, Manifest, Ready, Download, Finalizing, Finishing, BootCheck, Failed };
   Stage stage=Idle;
+  PanelUpdateView presentation=PanelUpdateView::Idle;
   PanelOta &ota;
   bool trusted=false,storageReady=false,failedJob=false;
   Preferences nvs;

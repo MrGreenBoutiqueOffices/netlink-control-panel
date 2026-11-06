@@ -359,9 +359,10 @@ void loop() {
     PanelDemo::UpdateAction action=demo.updateAction;demo.updateAction=PanelDemo::NoUpdateAction;
     bool idle=demo.idleForUpdate();bool wifi=wifiEnabled && WiFi.status()==WL_CONNECTED;
     if(action==PanelDemo::CheckUpdate)updater.check(idle,wifi);
-    else updater.install(idle,wifi,startupHealthy());
+    else if(action==PanelDemo::InstallUpdate)updater.install(idle,wifi,startupHealthy());
+    else updater.cancel();
   }
-  demo.updateView(updater.status(),updater.version(),updater.available(),updater.percent());
+  demo.updateView(updater.status(),updater.version(),updater.available(),updater.percent(),updater.view(),updater.cancelable());
   if(production.expire(millis()))demo.setDeviceState(production.devices);
   // USB always has priority and can recover/reconfigure a bad Wi-Fi setup.
   readStream(Serial, usbInbox, Transport::USB);

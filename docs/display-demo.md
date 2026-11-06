@@ -1,75 +1,53 @@
-# Standalone design preview on the LILYGO display
+# Native display and interactive preview
 
-The firmware simulates a desk and monitor entirely locally. No NetLink, MQTT, desk UART or DDC/CI monitor is connected. Touch controls are independent of a USB or Wi-Fi management session. Heights and preferences exist only in RAM and return to demo values after restart.
+The current source, `docs/design/netlink-bedienpaneel.pdf`, contains 25 screens. The firmware and browser preview cover desk controls, personal demo heights, confirmation, movement/stop, offline status, the two-row menu, monitor settings, preferences, panel settings/rotation, software updates, startup/connection, update outcomes, obstruction, calibration, sleep and welcome.
 
-## Version number on the display
+## Run the preview
 
-Since 0.5.1, More → Panel (`Meer` → `Paneel`) shows the firmware version below HELDERHEID PANEEL. The text uses the same version source as the management and update protocols and rotates with the screen.
-
-0.5.2 also fixes dragging the brightness slider when the panel is rotated 180 degrees. This fix was tested locally; the latest physical installation is 0.5.1.
-
-## New design set in 0.5.0
-
-The third supplied PDF contains 17 screens. 0.5.0 adds larger arrows, the two-row menu, normal/180-degree rotation, the minimal idle screen and the expanded startup, connection, update, error, obstacle and calibration screens. Target-height controls and the 62–127-cm limits remain in effect.
-
-Rotation changes both the entire framebuffer and touch coordinates. It remains a RAM setting in this demo. After the configured inactivity period, a quiet height-only screen appears; the first touch wakes the previous page without performing an action.
-
-Additional examples on the display: open More (`Meer`) and hold the empty bottom-right area for at least one second. In status examples, advance by holding the left side for at least one second. Error buttons such as Later and OK return to Desk (`Bureau`); Opnieuw opens the connection example. In Calibration (`Afstellen`), the large hold button lowers only the local example height, stops on release and never goes below 62 cm. Scenario mode loads the example values from the design.
-
-Actual OTA progress uses the new update image with the real percentage. A new boot awaiting confirmation explicitly shows Nieuwe firmware controleren. The demo is blocked during that real management action. Other error/obstacle/calibration screens are local design scenarios, not NetLink integration.
-
-0.5.0 was installed over USB on the identified display; esptool verified the written flash hash. USB was then used to read back version, expected image hash, VALID state, startup self-check and limits. A coherent snapshot of Panel (`Paneel`) was preserved while the live UI entered Idle (`Ruststand`). No screen changes were injected during that final check. Evidence: `artifacts/display-0.5.0/verification.json` and `comparison.png`.
-
-## Controls since 0.4.3
-
-- The lower limit is 62 cm and the upper limit 127 cm (620–1270 mm). Taps, holds, presets, demo input and confirmed movements respect these limits.
-- A short tap on Hoger or Lager changes only the target height by 1 cm.
-- Holding repeats that target-height step after 350 ms, then every 180 ms. Release or dragging outside the arrow stops adjustment; the dark confirmation screen remains.
-- Current height stays unchanged while selecting. Only Bevestigen starts simulated movement. Annuleren discards the selection.
-- Zitten and Staan also select a target height first. Bevestigen starts simulation toward that preset.
-- During confirmed movement, one touch anywhere on the screen stops the simulation.
-- Meer opens Monitor, Voorkeuren and Paneel. Monitor offers demo brightness, power and input; Voorkeuren saves the current demo height as a preset; Paneel offers brightness, dim timeout and rotation. Sliders respond to taps and drags.
-- Hold Meer on the home screen for about one second to disconnect/reconnect the simulated connection. Desk actions are blocked in that offline state; local panel settings remain usable.
-- After the configured dim timeout, the first touch wakes the screen without performing another action.
-
-The reference is `docs/design/netlink-bedienpaneel.pdf` (the third PDF; the previous version is preserved in `docs/design/v2/`), with seventeen 640 × 180 screens. Original screen images are embedded compactly as RGB565/RLE; changing text uses locally generated Inter glyphs. The original font is unavailable as a usable webfont in the raster PDF; the limited typographic difference is documented in `design-qa.md`.
-
-## Regenerate assets
+Serve the repository root, then open `/preview/`:
 
 ```sh
-uv run scripts/generate_demo_assets.py
-uv tool run --from platformio==6.1.18 pio run --project-dir firmware
+python3 -m http.server 8768 --bind 127.0.0.1
 ```
 
-The generator pins optional dependencies in its script metadata. A normal firmware build uses the checked-in generated files and does not need those Python packages.
+The browser scenario selector contains all 25 PDF pages. Its check → download → installation → restart/success flow is entirely simulated; it does not contact GitHub, flash firmware or send device commands. Download cancellation and error/retry screens can also be tried. Personalization uses the supplied sample name and heights only in demo scenarios.
 
-## Repeatable checks
+The native C++ renderer runs on the LILYGO at 640 × 180 pixels. The browser copy provides a separate local simulation. This revision has not been flashed onto the physical panel; native renders and browser checks are not device acceptance.
 
-`tests/test_panel_demo.py` compiles exactly the same C++ state machine and renderer as the firmware. It tests short taps, hold, release, target versus current height, confirmation, cancellation, stop, offline blocking, preferences, sliders, dimming and framebuffer bounds.
+## Controls
+
+- Heights stay within 62–127 cm (620–1270 mm).
+- A short arrow tap changes only the target height by 1 cm. Holding repeats after 350 ms, then every 180 ms. Release or dragging outside stops target editing and clears the pressed color.
+- Current height remains unchanged until **Bevestigen**. **Annuleren** discards the target. Sitting/standing presets and the welcome screen also select a target before confirmation.
+- A touch anywhere during simulated movement stops it.
+- **Meer** opens Monitor, Voorkeuren, Paneel and Software. The menu and desk notification reflect an available update.
+- **Paneel** controls brightness, dim timeout and 180-degree rotation. Rotation applies to the framebuffer and touch coordinates. Settings are persisted by the panel settings journal; demo heights and presets remain in RAM.
+- The first touch after dimming wakes the screen without an additional action.
+- The calibration hold button lowers only the local demo height and stops on release, at or above 62 cm.
+
+## Software
+
+The version is now shown on **Meer → Software**, using the same version source as the protocol and release build. The screen distinguishes checking, available/current firmware, downloading with cancellation, installation, success and failure/retry. Actual signed Wi-Fi updates use these views; see [signed updates](signed-updates.md) for activation and verification.
+
+During real installation or candidate boot checking, conflicting controls remain blocked. A download can be cancelled before activation. No cancellation or navigation can interrupt final verification or take ownership of an active update.
+
+## Production status and profile examples
+
+`device.state.v1` supplies real read-only desk/monitor status; see [production protocol](production-protocol.md). A Waveshare-only setup or desk without a monitor is supported. Unknown/stale readings remain explicit. Tapping arrows does not substitute simulated data or start movement in this mode.
+
+The sample profile name, personal presets and welcome view do not establish an authenticated identity. Production status clears the sample profile. A real profile and preference integration requires a separate protocol contract.
+
+## Assets and checks
+
+Source PDF pages are normalized to `docs/design/reference-01.png` through `reference-25.png`. Generated RGB565/RLE frames preserve existing firmware scene IDs; extra scenes add the profile, update and welcome examples. Dynamic text uses locally rasterized Inter. RGB565 and font rendering can differ slightly from the original raster typography.
 
 ```sh
-uv run python -m unittest discover -s tests -p test_panel_demo.py -v
+uv run --locked python scripts/generate_demo_assets.py
+uv run --locked python scripts/generate_demo_assets.py --check
+uv run --locked pio run --project-dir firmware
+uv run --locked python scripts/check_tests.py
 ```
 
-`scripts/capture_panel_demo.py` reads the actual framebuffer and can select local demo screens and example input. It changes only RAM demo state, never firmware or real equipment. Do not start it during a user review: it switches screens and may conflict with real touches.
+`tests/test_panel_demo.py` compiles the actual state machine/renderer and checks all 25 scene bounds, navigation, target editing, release, confirmation, limits, rotation, cancellation and demo-profile isolation. `tests/test_github_updates.py` exercises the real updater with temporary signatures and fake network/NVS/flash.
 
-## Recorded limitations
-
-0.4.0 was installed and confirmed over Wi-Fi. The first four screen images were read from the actual panel; a later capture was correctly stopped because a touch changed state during capture. The old direct-move interpretation in 0.4.1 was replaced with target-height-only editing in 0.4.2.
-
-The large 0.4.1 Wi-Fi transfer failed around 95% after exhausting the reconnect budget. Resume works, but Wi-Fi OTA on this connection and larger image is not reliable enough yet. USB is therefore the chosen installation route. Boot selection and physical ESP32-S3/MAC were checked before writing; only the active application slot is updated over the cable, without replacing NVS/bootloader/partitions.
-
-0.4.3 was installed over USB and esptool verified the written flash hash. The same USB connection then reported running version, expected image hash, VALID state and a passing display/touch startup self-check. Larger USB responses now work with a 4096-byte TX buffer.
-
-On the actual device, the shared UI handler verified: a short up tap selected 75 cm, holding then selected 80 cm, release kept the target stable, one down tap selected 79 cm, and current height remained 74 cm throughout. Annuleren returned to the home screen. Firmware reports min 620 and max 1270 mm. Endpoint behavior and movement to the limit are covered by the passing native regression test; no automatic movement demo was started during this final check.
-
-Evidence is stored locally in `artifacts/display-0.4.3/verification.json` and the USB installation log. The full 46-test suite, lint and formatting passed for this release. Physical user assessment of look and feel and touch remains the next step.
-
-
-The atomic framebuffer API since 0.5.0 makes one PSRAM copy at offset zero and gives every chunk the same `snapshot_id` and `snapshot_screen`. Concurrent operation or automatic dimming can no longer mix that capture. The browser copy retains the previous design set for now; this 17-screen implementation is the native display demo.
-
-## Read-only status in 0.7.0
-
-A new webserver adapter can send actual desk and monitor status with capability `device.state.v1`; see `production-protocol.md`. There is no Dell dependency: a Waveshare alone or a desk without a monitor is supported. The host selects one monitor; unknown or old values are explicitly indicated. In this mode, tap/hold/release does not change height or start simulation. Control commands follow later.
-
-Native C++ tests cover atomic validation, data expiry, unknown status and blocked touch. Native screens were visually checked; this is not hardware/NetLink acceptance. The latest physically verified firmware remains 0.6.0; 0.7.0 has not been installed yet.
+`scripts/capture_panel_demo.py` can read atomic framebuffer snapshots and select the 25 native scenes over USB or paired TLS. Do not run it during a user review: it switches local demo screens. It writes no firmware and sends no real equipment commands.

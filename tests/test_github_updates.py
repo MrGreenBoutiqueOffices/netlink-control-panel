@@ -122,6 +122,10 @@ int main(int argc,char **argv){
  bool installed=u.install(true,true,true);
  if(mode=="storage"){assert(!installed && begins==0);return 0;}
  assert(installed && begins==1);assert(!u.install(true,true,true));assert(attempt().phase==UpdatePhase::Downloading);
+ if(mode=="cancel"){
+  assert(u.cancelable() && u.cancel());assert(!o.receiving() && !o.committed());ticks(u);
+  assert(attempt().phase==UpdatePhase::Interrupted && !u.busy() && !u.cancel());return 0;
+ }
  if(mode=="powerloss"){
   events.clear();PanelOta restarted(testPolicy());restarted.bootStart();PanelUpdater next(restarted,true);next.begin();
   assert(attempt().phase==UpdatePhase::Interrupted && !next.busy());
@@ -261,6 +265,7 @@ class GithubUpdateTests(unittest.TestCase):
                 "hash",
                 "interrupted",
                 "powerloss",
+                "cancel",
                 "rollback",
                 "unhealthy",
                 "success",

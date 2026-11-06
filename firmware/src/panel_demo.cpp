@@ -66,11 +66,19 @@ void number(uint16_t *p,int x,int baseline,int value,int font,uint16_t fg,uint16
 }
 
 const char *PanelDemo::name() const {
-  static const char *names[]={"bureau","bevestigen","bewegen","offline","menu","monitor","voorkeuren","paneel","paneel_gedraaid","opstarten","verbinden","bijwerken","bijgewerkt","update_mislukt","obstakel","afstellen","ruststand","updates"};return dimmed?"ruststand":names[screen];
+  static const char *names[]={"bureau","bevestigen","bewegen","offline","menu","monitor","voorkeuren","paneel","paneel_gedraaid","opstarten","verbinden","bijwerken","bijgewerkt","update_mislukt","obstakel","afstellen","ruststand","updates","welkom"};return dimmed?"ruststand":names[screen];
 }
 void PanelDemo::draw(uint16_t *p) const {
   int frame=screen==SettingsRotated?Settings:screen; if(screen==Desk && !connected) frame=Offline; if(dimmed)frame=Sleep;
-  base(p,frame==Updates?Menu:frame);
+  if(screen==Updates) {
+    frame=updateState==PanelUpdateView::Checking?20:updateState==PanelUpdateView::Downloading?21:
+      updateState==PanelUpdateView::Current?22:updateState==PanelUpdateView::CheckFailed?23:
+      updateState==PanelUpdateView::Installing?Updating:updateState==PanelUpdateView::Installed?Updated:
+      updateState==PanelUpdateView::InstallFailed?UpdateFailed:17;
+  } else if(screen==Welcome)frame=24;
+  else if(screen==Desk && profileActive)frame=18;
+  else if(screen==Desk && updateNotice)frame=19;
+  base(p,frame);
   char value[80],h[20],other[20];
   if(dimmed || screen==Sleep) {
     if(height!=740) { rect(p,240,65,180,55,Bg);formatHeight(h,height);int x=(640-width(h,9)-width("cm",1)-4)/2;text(p,x,108,h,9,Disabled);text(p,x+width(h,9)+4,108,"cm",1,Disabled); }
@@ -115,21 +123,48 @@ void PanelDemo::draw(uint16_t *p) const {
       snprintf(value,sizeof(value),"NAAR %s - %s CM",motionKind==1?"ZITHOOGTE":motionKind==2?"STAHOOGTE":"DOELHOOGTE",h);text(p,40,55,value,0,Brown);
     }
   } else if(screen==Updates) {
-    rect(p,0,0,640,180,Bg);
-    rect(p,8,8,88,164,Card);text(p,27,96,"Terug",3,Ink);
-    text(p,116,30,"FIRMWARE-UPDATES",1,Gold);
-    snprintf(value,sizeof(value),"Huidig: %s",PANEL_FIRMWARE_VERSION);text(p,116,55,value,2,Muted);
-    text(p,116,83,updateStatus,1,Ink);
-    if(updateVersion[0]) {snprintf(value,sizeof(value),"Beschikbaar: %s",updateVersion);text(p,116,105,value,2,Gold);}
-    if(busy) {
-      rect(p,116,143,500,6,Selected);rect(p,116,143,500*updateProgress/100,6,Gold);
-      snprintf(value,sizeof(value),"%d%%",updateProgress);text(p,575,130,value,2,Muted);
-    } else {
-      rect(p,112,120,240,52,Card);text(p,140,152,"Controleren",3,Ink);
-      rect(p,364,120,260,52,updateAvailable?Gold:Card);text(p,407,152,"Installeren",3,updateAvailable?Bg:Disabled);
+    bool downloading=updateState==PanelUpdateView::Downloading;
+    bool installing=updateState==PanelUpdateView::Installing;
+    bool installed=updateState==PanelUpdateView::Installed;
+    bool installFailed=updateState==PanelUpdateView::InstallFailed;
+    if(installing || installed) {
+      rect(p,20,65,610,43,Bg);
+      snprintf(value,sizeof(value),installing?"Versie %s installeren":"Bijgewerkt naar %s",updateVersion[0]?updateVersion:updateRunningVersion);
+      text(p,24,96,value,10,Ink);
+      if(installing) {
+        rect(p,24,132,532,6,Selected);rect(p,24,132,532*updateProgress/100,6,Gold);
+        rect(p,570,120,70,50,Bg);snprintf(value,sizeof(value),"%d%%",updateProgress);text(p,616-width(value,2),141,value,2,Ink);
+      }
+    } else if(!installFailed) {
+      bool error=updateState==PanelUpdateView::CheckFailed;
+      int baseline=downloading?81:error?86:96;
+      const char *sourceVersion=updateState==PanelUpdateView::Current?"0.9.0":"0.8.0";
+      if(strcmp(updateRunningVersion,sourceVersion)) {
+        rect(p,112,baseline-26,308,32,Bg);snprintf(value,sizeof(value),"Versie %s",updateRunningVersion);text(p,118,baseline,value,10,Ink);
+      }
+      if(downloading) {
+        rect(p,112,89,308,25,Bg);snprintf(value,sizeof(value),"Versie %s downloaden...",updateVersion);text(p,118,107,value,1,Gold);
+        rect(p,118,130,236,6,Selected);rect(p,118,130,236*updateProgress/100,6,Gold);
+        rect(p,368,117,50,30,Bg);snprintf(value,sizeof(value),"%d%%",updateProgress);text(p,410-width(value,2),138,value,2,Ink);
+      } else if(updateState==PanelUpdateView::Available) {
+        rect(p,112,104,308,27,Bg);snprintf(value,sizeof(value),"Versie %s beschikbaar",updateVersion);text(p,118,122,value,1,Gold);
+      } else if(updateState==PanelUpdateView::Idle || error) {
+        rect(p,112,error?94:104,308,error?50:28,Bg);
+        // Bound and wrap dynamic failure copy inside the source's two-line area.
+        char line[80];snprintf(line,sizeof(line),"%s",updateStatus);
+        size_t split=strlen(line);
+        while(split && width(line,1)>290) {size_t k=split;while(k && line[k]!=' ')k--;if(!k)break;split=k;line[k]=0;}
+        text(p,118,error?110:122,line,1,error?rgb(232,160,126):Gold);
+        if(split<strlen(updateStatus))text(p,118,error?130:142,updateStatus+split+1,1,error?rgb(232,160,126):Gold);
+        if(!error) {rect(p,432,8,200,164,Card);text(p,478,96,"Controleren",3,Ink);}
+      }
     }
+  } else if(screen==Welcome) {
+    // Personalization is demo-only until the production protocol provides a profile.
   } else if(screen==Menu) {
-    rect(p,372,94,260,78,Card);text(p,398,125,"Updates",3,Ink);text(p,398,151,"Via wifi / GitHub",1,Muted);
+    rect(p,420,135,205,24,Card);
+    if(updateAvailable) {snprintf(value,sizeof(value),"Update %s beschikbaar",updateVersion);text(p,426,150,value,1,Gold);}
+    else text(p,426,150,updateState==PanelUpdateView::Checking?"Controleren...":"Firmware " PANEL_FIRMWARE_VERSION,1,Muted);
     if(monitor!=70 || !monitorOn) { rect(p,154,50,200,22,Card);snprintf(value,sizeof(value),"%s - %d%%",monitorOn?"Aan":"Uit",monitor);text(p,158,64,value,1,Muted); }
     if(sit!=740 || stand!=1120) { rect(p,421,50,200,22,Card);formatHeight(h,sit,false);formatHeight(other,stand,false);snprintf(value,sizeof(value),"%s - %s cm",h,other);text(p,426,64,value,1,Muted); }
     if(dimMinutes!=1) { rect(p,154,136,200,22,Card);snprintf(value,sizeof(value),dimMinutes?"Dimmen na %d min":"Dimmen uit",dimMinutes);text(p,158,150,value,1,Muted); }
@@ -139,7 +174,6 @@ void PanelDemo::draw(uint16_t *p) const {
     int x=458-width(value,6)-width("%",4);text(p,x,68,value,6,Ink);text(p,x+width(value,6),68,"%",4,Muted);
     rect(p,174,98,220,65,Bg);rect(p,180,130,208,6,Selected);int pos=180+208*percent/100;rect(p,180,130,pos-180,6,Gold);rect(p,pos-6,107,12,52,Ink);
     if(settings) {
-      text(p,118,78,"Firmware " PANEL_FIRMWARE_VERSION,1,Muted);
       if(dimMinutes!=1) { rect(p,480,40,145,40,Card);snprintf(value,sizeof(value),dimMinutes?"Na %d min":"Uit",dimMinutes);text(p,486,68,value,4,Ink); }
       if(rotated) { rect(p,480,126,145,39,Card);text(p,486,152,"Gedraaid",4,Ink); }
     } else {
@@ -147,7 +181,8 @@ void PanelDemo::draw(uint16_t *p) const {
       if(input) { rect(p,480,126,145,39,Card);text(p,486,152,input==1?"HDMI 2":"DisplayPort",4,Ink); }
     }
   } else if(screen==Presets) {
-    rect(p,112,70,288,80,Bg);number(p,118,122,height,6,Ink,Muted);
+    if(!profileActive)rect(p,112,128,288,28,Bg);
+    if(height!=1086) {rect(p,112,66,288,58,Bg);number(p,118,112,height,6,Ink,Muted);}
     for(int n=0;n<2;++n) {
       int y=n?94:8;uint16_t bg=savedPreset==n+1?Gold:Card;
       rect(p,408,y,224,78,bg);formatHeight(h,n?stand:sit,false);snprintf(value,sizeof(value),"%s - NU %s CM",n?"STAAN":"ZITTEN",h);
@@ -215,14 +250,14 @@ void PanelDemo::setDeviceState(const PanelDeviceState &value) {
   bool changed=!readOnly || deviceState.heightKnown!=value.heightKnown || deviceState.heightFresh!=value.heightFresh ||
     deviceState.heightMm!=value.heightMm || deviceState.monitorKnown!=value.monitorKnown || deviceState.monitorFresh!=value.monitorFresh ||
     deviceState.monitorBrightness!=value.monitorBrightness || strcmp(deviceState.monitorBus,value.monitorBus) || strcmp(deviceState.monitorPower,value.monitorPower) || strcmp(deviceState.monitorSource,value.monitorSource);
-  readOnly=true;deviceState=value;height=value.heightMm;connected=value.heightKnown;
-  if(screen==Confirm || screen==Moving || screen==Presets || screen==Calibrate)screen=Desk;
+  readOnly=true;profileActive=false;deviceState=value;height=value.heightMm;connected=value.heightKnown;
+  if(screen==Confirm || screen==Moving || screen==Presets || screen==Calibrate || screen==Welcome)screen=Desk;
   manualHold=false;calibrating=false;target=height;if(changed)dirty=true;
 }
-void PanelDemo::updateView(const char *status,const char *version,bool available,int percent) {
-  if(strcmp(updateStatus,status) || strcmp(updateVersion,version) || updateAvailable!=available || updateProgress!=percent)dirty=true;
+void PanelDemo::updateView(const char *status,const char *version,bool available,int percent,PanelUpdateView phase,bool cancelable) {
+  if(strcmp(updateStatus,status) || strcmp(updateVersion,version) || updateAvailable!=available || updateProgress!=percent || updateState!=phase || updateCancelable!=cancelable)dirty=true;
   snprintf(updateStatus,sizeof(updateStatus),"%s",status);snprintf(updateVersion,sizeof(updateVersion),"%s",version);
-  updateAvailable=available;updateProgress=percent;
+  updateAvailable=available;updateNotice=available;updateProgress=percent;updateState=phase;updateCancelable=cancelable;
 }
 void PanelDemo::setHeight(int value) { height=clampHeight(value);dirty=true; }
 void PanelDemo::setBusy(bool value) {
@@ -230,7 +265,11 @@ void PanelDemo::setBusy(bool value) {
   busy=value;
 }
 void PanelDemo::touchDown(int x,int y,uint32_t now) {
-  if(x<0 || x>=640 || y<0 || y>=180 || busy || finger) return;
+  if(x<0 || x>=640 || y<0 || y>=180 || finger) return;
+  if(busy) {
+    int bx=rotated?639-x:x,by=rotated?179-y:y;
+    if(screen!=Updates || !updateCancelable || bx<432 || bx>=632 || by<8 || by>=172)return;
+  }
   if(rotated) { x=639-x;y=179-y; }
   finger=true;downX=x;downY=y;downAt=now;lastTouch=now;consumed=false;savedPreset=0;
   if(dimmed || screen==Sleep) { dimmed=false;if(screen==Sleep)screen=Desk;consumed=true;dirty=true; }
@@ -262,15 +301,27 @@ void PanelDemo::touchUp(uint32_t now) {
   if(!finger) return;finger=false;
   if(calibrating) { calibrating=false;lastTick=0;consumed=true;dirty=true;if(height==MinHeightMm)screen=Desk; }
   if(manualHold) { manualHold=false;lastTick=0;consumed=true;dirty=true; }
-  if(!busy && !consumed && now-downAt>=30) tap(downX,downY,now-downAt);
+  if((!busy || (screen==Updates && updateCancelable)) && !consumed && now-downAt>=30) tap(downX,downY,now-downAt);
   lastTouch=now;
 }
 void PanelDemo::tap(int x,int y,uint32_t held) {
   dirty=true;
   if(screen==Updates) {
-    if(x>=8 && x<96 && y>=8 && y<172)screen=Menu;
-    else if(y>=120 && y<172 && x>=112 && x<352)updateAction=CheckUpdate;
-    else if(y>=120 && y<172 && x>=364 && x<624 && updateAvailable)updateAction=InstallUpdate;
+    if(updateCancelable && x>=432 && x<632 && y>=8 && y<172)updateAction=CancelUpdate;
+    else if(busy)return;
+    else if(updateState==PanelUpdateView::InstallFailed && x>=464 && x<632 && y>=8 && y<172) {
+      if(y<86)updateAction=CheckUpdate;else screen=Menu;
+    } else if(x>=8 && x<96 && y>=8 && y<172)screen=Menu;
+    else if(x>=432 && x<632 && y>=8 && y<172) {
+      if(updateAvailable && y<86)updateAction=InstallUpdate;
+      else updateAction=CheckUpdate;
+    }
+    return;
+  }
+  if(screen==Welcome) {
+    if(x>=464 && x<632 && y>=8 && y<172) {
+      if(y<86){target=sit;motionKind=1;screen=Confirm;}else screen=Desk;
+    }
     return;
   }
   if(screen>=Boot) {
@@ -334,8 +385,19 @@ bool PanelDemo::tick(uint32_t now) {
   bool result=dirty;dirty=false;return result;
 }
 bool PanelDemo::scene(int index,uint32_t now,bool preserveSettings) {
-  if(index<0 || index>16 || busy)return false;
-  PanelSettings saved=settings();*this=PanelDemo();if(preserveSettings)applySettings(saved);screen=Screen(index);lastTouch=now;
+  if(index<0 || index>24 || busy)return false;
+  PanelSettings saved=settings();*this=PanelDemo();if(preserveSettings)applySettings(saved);screen=Screen(index<=17?index:index==24?Welcome:index>=20?Updates:Desk);lastTouch=now;
+  if(index==18 || index==24 || screen==Presets){profileActive=true;sit=720;stand=1140;}
+  if(index==18)height=720;
+  if(index==19)updateNotice=true;
+  if(screen==Menu){updateAvailable=true;strcpy(updateVersion,"0.9.0");updateState=PanelUpdateView::Available;}
+  if(index==17) {updateAvailable=true;updateState=PanelUpdateView::Available;strcpy(updateVersion,"0.9.0");}
+  if(index>=20 && index<=23) {
+    updateState=index==20?PanelUpdateView::Checking:index==21?PanelUpdateView::Downloading:index==22?PanelUpdateView::Current:PanelUpdateView::CheckFailed;
+    strcpy(updateVersion,"0.9.0");updateProgress=index==21?64:0;updateCancelable=index==21;
+    if(index==22)strcpy(updateRunningVersion,"0.9.0");
+    if(index==23)strcpy(updateStatus,"Controleren lukte niet. Probeer het later opnieuw.");
+  }
   if(screen==Moving) { height=942;target=1120;motionKind=2;freezeUntil=now+5000; }
   if(screen==Offline)connected=false;
   if(screen==Presets)height=1086;

@@ -5,7 +5,7 @@
 
 bool PanelUpdater::busy() const {
   return network.active() || stage==Clock || stage==Release || stage==Authorization || stage==Manifest ||
-    stage==Download || stage==Finishing || stage==BootCheck;
+    stage==Download || stage==Finalizing || stage==Finishing || stage==BootCheck;
 }
 bool PanelUpdater::save(UpdatePhase phase) {
   attempt.phase=phase;attempt.checksum=attempt.crc();
@@ -22,18 +22,20 @@ void PanelUpdater::begin() {
   StaticJsonDocument<768> boot;ota.describe(boot.to<JsonObject>());
   const char *running=boot["image_sha256"] | "";
   UpdatePhase reconciled=attempt.reconcile(running,ota.pending());
-  if(reconciled==UpdatePhase::BootPending) {stage=BootCheck;strlcpy(message,"Nieuwe firmware lokaal controleren",sizeof(message));return;}
+  if(reconciled==UpdatePhase::BootPending) {stage=BootCheck;presentation=PanelUpdateView::Installing;strlcpy(message,"Nieuwe firmware lokaal controleren",sizeof(message));return;}
   if(reconciled!=attempt.phase && !save(reconciled)) {fail("Update-uitkomst niet opgeslagen");return;}
+  presentation=reconciled==UpdatePhase::Succeeded?PanelUpdateView::Current:PanelUpdateView::InstallFailed;
   if(reconciled==UpdatePhase::Succeeded)strlcpy(message,"Update geslaagd",sizeof(message));
   if(reconciled==UpdatePhase::RolledBack)strlcpy(message,"Vorige firmware hersteld",sizeof(message));
   if(reconciled==UpdatePhase::Interrupted)strlcpy(message,"Update onderbroken; controleer opnieuw",sizeof(message));
   if(reconciled==UpdatePhase::Failed)strlcpy(message,"Update mislukt; controleer opnieuw",sizeof(message));
 }
 void PanelUpdater::fail(const char *reason) {
+  presentation=stage==Download || stage==Finalizing || stage==Finishing || stage==BootCheck?PanelUpdateView::InstallFailed:PanelUpdateView::CheckFailed;
   network.cancel();
   ota.abort();
   free(metadata);metadata=nullptr;used=capacity=0;
-  if(stage==Download || stage==Finishing)save(UpdatePhase::Failed);
+  if(stage==Download || stage==Finalizing || stage==Finishing)save(UpdatePhase::Failed);
   stage=Failed;failedJob=true;strlcpy(message,reason,sizeof(message));
 }
 bool PanelUpdater::fetch(const char *url,Stage next,size_t limit,bool asset) {
@@ -47,15 +49,18 @@ bool PanelUpdater::fetch(const char *url,Stage next,size_t limit,bool asset) {
 }
 bool PanelUpdater::check(bool idle,bool wifi) {
   if(busy())return false;
-  if(!idle || ota.receiving() || ota.pending() || ota.committed()) {strlcpy(message,"Wacht tot het paneel vrij is",sizeof(message));return false;}
-  if(!storageReady) {strlcpy(message,"Updateopslag niet beschikbaar",sizeof(message));return false;}
-  if(!trusted) {strlcpy(message,"Updatesleutel nog niet ingesteld",sizeof(message));return false;}
-  if(!wifi) {strlcpy(message,"Verbind eerst met wifi",sizeof(message));return false;}
+  auto reject=[&](const char *reason) {
+    stage=Failed;presentation=PanelUpdateView::CheckFailed;strlcpy(message,reason,sizeof(message));return false;
+  };
+  if(!idle || ota.receiving() || ota.pending() || ota.committed())return reject("Wacht tot het paneel vrij is");
+  if(!storageReady)return reject("Updateopslag niet beschikbaar");
+  if(!trusted)return reject("Updatesleutel nog niet ingesteld");
+  if(!wifi)return reject("Verbind eerst met wifi");
   release=GithubRelease{};authorization=UpdateAuthorization{};envelope[0]=0;
   strlcpy(message,"GitHub-release controleren...",sizeof(message));
   // Certificate validity needs a clock. No TLS request is made without it.
   configTime(0,0,"time.cloudflare.com","pool.ntp.org");
-  stage=Clock;started=millis();return true;
+  stage=Clock;presentation=PanelUpdateView::Checking;started=millis();return true;
 }
 bool PanelUpdater::install(bool idle,bool wifi,bool healthy) {
   if(stage!=Ready || network.active() || !idle || !wifi || !healthy || ota.receiving() || ota.pending() || ota.committed())return false;
@@ -70,7 +75,7 @@ bool PanelUpdater::install(bool idle,bool wifi,bool healthy) {
   ota.handle(request,response,healthy);
   if(response["ok"]!=true) {save(UpdatePhase::Failed);fail("Update kan niet worden gestart");return false;}
   if(!fetch(release.firmware,Download,authorization.size)) {save(UpdatePhase::Failed);return false;}
-  strlcpy(message,"Firmware downloaden...",sizeof(message));return true;
+  presentation=PanelUpdateView::Downloading;strlcpy(message,"Firmware downloaden...",sizeof(message));return true;
 }
 void PanelUpdater::complete(bool healthy) {
   if(stage==Release) {
@@ -96,28 +101,38 @@ void PanelUpdater::complete(bool healthy) {
     if(strcmp(actual,authorization.manifestSha256) || deserializeJson(doc,reinterpret_cast<const char *>(metadata),used) ||
        !githubManifestMatches(doc,release,authorization)) {fail("Release komt niet overeen met handtekening");return;}
     free(metadata);metadata=nullptr;capacity=used=0;
-    if(!strcmp(authorization.version,PANEL_FIRMWARE_VERSION)) {stage=Idle;strlcpy(message,"Je hebt de nieuwste firmware",sizeof(message));return;}
-    stage=Ready;strlcpy(message,"Nieuwe firmware beschikbaar",sizeof(message));return;
+    if(!strcmp(authorization.version,PANEL_FIRMWARE_VERSION)) {stage=Idle;presentation=PanelUpdateView::Current;strlcpy(message,"Je hebt de nieuwste firmware",sizeof(message));return;}
+    stage=Ready;presentation=PanelUpdateView::Available;strlcpy(message,"Nieuwe firmware beschikbaar",sizeof(message));return;
   }
   if(stage==Download) {
     if(used!=authorization.size || !ota.receiving() || !healthy) {fail("Firmwaredownload onvolledig");return;}
+    stage=Finalizing;presentation=PanelUpdateView::Installing;return;
+  }
+  if(stage==Finalizing) {
+    if(!healthy) {fail("Lokale firmwarecontrole mislukt");return;}
     // Persist expected candidate before changing boot selection. A reset before
     // activation reconciles to the still-running old image on the next boot.
     if(!save(UpdatePhase::BootPending)) {fail("Bootcontrole niet opgeslagen");return;}
     StaticJsonDocument<128> request;StaticJsonDocument<384> response;
     request["type"]="ota_finish";request["id"]=1;ota.handle(request,response,healthy);
     if(response["ok"]!=true) {fail("Firmwarecontrole mislukt");return;}
-    stage=Finishing;strlcpy(message,"Update starten...",sizeof(message));
+    stage=Finishing;presentation=PanelUpdateView::Installed;strlcpy(message,"Update starten...",sizeof(message));
   }
 }
+bool PanelUpdater::cancel() {
+  if(!cancelable())return false;
+  network.cancel();ota.abort();save(UpdatePhase::Interrupted);
+  stage=Idle;presentation=PanelUpdateView::Idle;failedJob=true;strlcpy(message,"Update geannuleerd",sizeof(message));return true;
+}
 void PanelUpdater::tick(bool healthy,bool wifi) {
+  if(stage==Finalizing) {complete(healthy);return;}
   if(stage==BootCheck) {
     if(!healthy)healthySince=0;
     else if(!healthySince)healthySince=millis();
     else if(millis()-healthySince>=3000) {
       if(!ota.confirmLocal(attempt.image,true))return; // Existing 90s rollback timer remains armed on failure.
       if(!save(UpdatePhase::Succeeded)) {fail("Update-uitkomst niet opgeslagen");return;}
-      stage=Idle;strlcpy(message,"Update geslaagd",sizeof(message));
+      stage=Idle;presentation=PanelUpdateView::Current;strlcpy(message,"Update geslaagd",sizeof(message));
     }
     return;
   }
