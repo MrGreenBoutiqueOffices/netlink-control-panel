@@ -16,6 +16,8 @@ class PanelOta {
   void bootStart();
   void describe(JsonObject result);
   void handle(JsonDocument &message, JsonDocument &response, bool healthy);
+  bool authorize(JsonDocument &envelope, UpdateAuthorization &output) const;
+  bool confirmLocal(const char *expectedImageSha, bool healthy);
   void abort();
   void tick();
   bool receiving() const { return guard.running; }

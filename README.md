@@ -8,7 +8,7 @@ Firmware **0.8.0 from source commit `e8d2232` is installed on the prototype over
 
 | Component | Status |
 | --- | --- |
-| Native display demo | 17 supplied designs, entirely local simulation without a NetLink |
+| Native display demo | 25 supplied designs, entirely local simulation without a NetLink |
 | Height controls | Tap selects 1 cm; hold repeats; release retains the target height; only Confirm starts the simulation; limits 62–127 cm |
 | Panel | Brightness, dim timeout, 180° rotation and version number under More → Panel (`Meer` → `Paneel`); since 0.8.0 local settings are validated and retained across restarts; physical user acceptance is ongoing |
 | Firmware 0.8.0 | Restores the arrow press color after release and adds persistent local panel settings |
@@ -35,7 +35,7 @@ On the display, More (`Meer`) opens Monitor, Preferences (`Voorkeuren`) and Pane
 
 Additional design scenarios: in More, hold the empty bottom-right area for at least one second. In the status examples, hold the left side to advance. There is no automatic screen carousel.
 
-Without a display, open `preview/index.html`. The browser preview contains the earlier eight screens and is separate from USB, firmware and real equipment. The native display demo is the primary implementation of the latest 17 screens.
+Without a display, serve the repository root and open `/preview/`. The browser preview includes all 25 supplied screens and a simulated update flow; it is separate from USB, firmware and real equipment. The native display renderer uses the same design source.
 
 ## Development and checks
 
@@ -119,10 +119,16 @@ Start with the protocol and USB service; work on OTA diagnosis and CI in paralle
 | --- | --- |
 | `firmware/` | ESP32-S3 firmware, native demo and update code |
 | `host/netlink_panel/` | USB/Wi-Fi bench, updater, protocol decoder and simulator |
-| `preview/` | Browser demo of the earlier design set |
+| `preview/` | Interactive browser demo of all 25 designs |
 | `tests/` | Python, native renderer, protocol and recovery tests |
 | `scripts/` | Firmware preparation, asset generation and diagnostic captures |
 | `docs/` | Designs, usage, historical test results and planning |
+
+## Independent Wi-Fi updates
+
+On signed-policy firmware, open **Meer → Software** to check the latest stable GitHub release and explicitly install it. The panel downloads, verifies and confirms the update itself. For Wi-Fi without a bench server, use `uv run panel wifi setup --port <usb-port> --wifi-only`.
+
+The default build still has no production signing key or verified board revision; activation and hardware acceptance remain required. See [signed updates](docs/signed-updates.md) for setup and recovery behavior.
 
 ## License
 

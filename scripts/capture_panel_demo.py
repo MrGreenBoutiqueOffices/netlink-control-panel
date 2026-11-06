@@ -24,7 +24,7 @@ def main():
     parser.add_argument("--firmware", type=Path, required=True)
     parser.add_argument(
         "--scenes",
-        default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17",
+        default=",".join(str(scene) for scene in range(1, 26)),
         help="Comma-separated reference scene numbers to capture",
     )
     parser.add_argument("--output", type=Path, default=Path("artifacts/display-demo"))
@@ -72,10 +72,18 @@ def main():
             "obstakel",
             "afstellen",
             "ruststand",
+            "updates",
+            "bureau",
+            "bureau",
+            "updates",
+            "updates",
+            "updates",
+            "updates",
+            "welkom",
         ]
         selected = [int(value) - 1 for value in args.scenes.split(",")]
-        if not selected or any(value < 0 or value > 16 for value in selected):
-            raise ValueError("Scenes must be 1..17")
+        if not selected or any(value < 0 or value > 24 for value in selected):
+            raise ValueError("Scenes must be 1..25")
         for scene in selected:
             name = expected[scene]
             result = peer.request("demo_ui", op="scene", scene=scene)

@@ -1,5 +1,7 @@
 # Updating firmware over Wi-Fi — current host bench route
 
+For independent updates from the panel, see [signed Wi-Fi updates](signed-updates.md). This document describes the host-fed bench route.
+
 This document describes the existing host-driven bench route. The [decision for #15](signed-updates.md#decision-the-panel-owns-its-updates) is independent download and installation on the panel with local boot confirmation. Webserver integration is outside that update scope. This does not work in current firmware yet: the procedure below requires a paired host, including `ota_confirm` after reboot.
 
 See the [full-image diagnosis for issue #14](ota-full-image.md) for the progress-based host fix and remaining physical matrix.

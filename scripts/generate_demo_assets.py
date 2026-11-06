@@ -16,8 +16,8 @@ def generate(output):
     (output / "docs/design").mkdir(parents=True, exist_ok=True)
     (output / "firmware/src").mkdir(parents=True, exist_ok=True)
     doc = pymupdf.open(root / "docs/design/netlink-bedienpaneel.pdf")
-    if len(doc) != 17:
-        raise ValueError("This renderer expects exactly 17 design pages")
+    if len(doc) != 25:
+        raise ValueError("This renderer expects exactly 25 design pages")
     out = [
         "// Generated from the supplied design. Regenerate with scripts/generate_demo_assets.py.",
         '#include "demo_assets.h"',
@@ -28,20 +28,25 @@ def generate(output):
         "#include <stddef.h>",
         "struct DemoGlyph { uint32_t offset; uint16_t width,height; int16_t x,y,advance; };",
         "struct DemoFont { const uint8_t *pixels; const DemoGlyph *glyphs; int size; };",
-        "extern const uint16_t *const demoFrames[17];",
-        "extern const uint32_t demoFrameWords[17];",
+        "extern const uint16_t *const demoFrames[25];",
+        "extern const uint32_t demoFrameWords[25];",
         "extern const DemoFont demoFonts[11];",
     ]
+    # Preserve existing firmware scene IDs while using the latest PDF page order.
+    pages = [1, 3, 4, 5, 6, 7, 8, 9, 10, 17, 18, 19, 20, 21, 22, 23, 24, 12, 2, 11, 13, 14, 15, 16, 25]
     wordcounts = []
-    for n, page in enumerate(doc):
+    for n, number in enumerate(pages):
+        page = doc[number - 1]
         im = (
             Image.open(io.BytesIO(doc.extract_image(page.get_images()[0][0])["image"]))
             .convert("RGB")
             .resize((640, 180), Image.Resampling.LANCZOS)
         )
-        im.save(output / f"docs/design/reference-{n + 1:02}.png")
+        im.save(output / f"docs/design/reference-{number:02}.png")
         im = im.quantize(
-            colors=256 if n in (3, 12, 13, 14, 15) else 64, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE
+            colors=256 if number in (5, 15, 16, 20, 21, 22, 23) else 64,
+            method=Image.Quantize.MEDIANCUT,
+            dither=Image.Dither.NONE,
         ).convert("RGB")
         pixels = [((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3) for r, g, b in im.getdata()]
         rle = []
@@ -88,8 +93,8 @@ def generate(output):
             + "};"
         )
     out += [
-        "const uint16_t *const demoFrames[17] = {" + ",".join(f"frame{i}" for i in range(17)) + "};",
-        "const uint32_t demoFrameWords[17] = {" + ",".join(map(str, wordcounts)) + "};",
+        "const uint16_t *const demoFrames[25] = {" + ",".join(f"frame{i}" for i in range(25)) + "};",
+        "const uint32_t demoFrameWords[25] = {" + ",".join(map(str, wordcounts)) + "};",
         "const DemoFont demoFonts[11] = {"
         + ",".join("{fontPixels%d,fontGlyphs%d,%d}" % (i, i, s) for i, (s, w) in enumerate(fonts))
         + "};",
