@@ -6,7 +6,7 @@ const feedback = document.querySelector('#feedback');
 const scenario = document.querySelector('#scenario');
 const heightInput = document.querySelector('#demo-height');
 const pauseButton = document.querySelector('#motion-pause');
-const defaultState = () => ({ screen: 'desk', connected: true, height: 740, sit: 740, stand: 1120, target: 780, monitor: 70, monitorOn: true, input: 0, brightness: 100, dim: 1, contrast: false, rotated: false, profile: false, notice: false, firmware: '0.8.0', updateVersion: '0.9.0', hasUpdate: true, updatePhase: 'available', updateProgress: 0, saved: null, motionName: '', paused: false, manual: false });
+const defaultState = () => ({ screen: 'desk', connected: true, height: 740, sit: 740, stand: 1120, target: 780, motionStart: 740, monitor: 70, monitorOn: true, input: 0, brightness: 100, dim: 1, contrast: false, rotated: false, profile: false, notice: false, firmware: '0.8.0', updateVersion: '0.9.0', hasUpdate: true, updatePhase: 'available', updateProgress: 0, saved: null, motionName: '', paused: false, manual: false });
 let state = defaultState();
 let motionFrame = 0;
 let previousTime = 0;
@@ -39,8 +39,12 @@ function desk(confirming = false) {
   const title = offline ? 'LAATST BEKEND' : confirming ? 'HUIDIG' : Math.abs(state.height - state.sit) < 1 ? 'ZITHOOGTE' : Math.abs(state.height - state.stand) < 1 ? 'STAHOOGTE' : 'BUREAUHOOGTE';
   return `${side('down', chosen < 0)}${side('up', chosen > 0)}${state.profile && !confirming ? '<img class=profile-name src=assets/profile-name.png alt=Klaas>' : ''}<div class="desk-title label">${title}</div><div class="height-value"><span>${fmt(state.height)}</span><small class="unit">cm</small></div>${offline ? '<div class="offline-message"><span class="status-dot"></span>Geen verbinding</div>' : confirming ? `<div class="target"><div class="label">NAAR</div><div class="target-value">${fmt(state.target)}<small>cm</small></div></div>` : `<div class="height-gauge" style="--position:${58 - (state.height - MIN_HEIGHT_MM) / (MAX_HEIGHT_MM - MIN_HEIGHT_MM) * 53}px" aria-hidden="true"></div>`}${confirming ? `<button class="cancel" data-action="cancel">Annuleren</button><button class="confirm" data-action="confirm">Bevestigen${icon('check')}</button>` : `<button class="preset ${Math.abs(state.height - state.sit) < 1 ? 'is-current' : ''}" data-action="preset" data-preset="sit" ${disabled(offline)}><span class="label">ZITTEN</span><span class="preset-height">${presetFmt(state.sit)}</span></button><button class="preset stand ${Math.abs(state.height - state.stand) < 1 ? 'is-current' : ''}" data-action="preset" data-preset="stand" ${disabled(offline)}><span class="label">STAAN</span><span class="preset-height">${presetFmt(state.stand)}</span></button><button class="more" data-action="nav" data-to="menu">${icon('more')}${state.notice ? '<i class=update-dot></i>' : ''}<span>Meer</span></button>`}`;
 }
+function motionProgress() {
+  const distance = state.target - state.motionStart;
+  return distance ? Math.max(0, Math.min(100, 100 * (state.height - state.motionStart) / distance)) : 0;
+}
 function moving() {
-  return `<button class="moving-stop" data-action="stop" aria-label="Stop beweging"><span class="moving-caption">${state.motionName} · ${presetFmt(state.target)} CM</span><span class="moving-value"><span id="motion-height">${fmt(state.height)}</span><small>cm</small></span><span class="stop-copy"><strong>Stop</strong><span>Tik ergens op het scherm</span></span></button>`;
+  return `<button class="moving-stop" style="--motion-progress:${motionProgress()}%" data-action="stop" aria-label="Stop beweging"><span class="moving-caption">${state.motionName} · ${presetFmt(state.target)} CM</span><span class="moving-value"><span id="motion-height">${fmt(state.height)}</span><small>cm</small></span><span class="stop-copy"><strong>Stop</strong><span>Tik ergens op het scherm</span></span></button>`;
 }
 function menu() {
   const tiles = [['monitor','monitor','Monitor',`${state.monitorOn ? 'Aan' : 'Uit'} · ${state.monitor}%`],['presets','bookmark','Voorkeuren',`${presetFmt(state.sit)} · ${presetFmt(state.stand)} cm`],['panel','settings','Paneel',state.dim ? `Dimmen na ${state.dim} min` : 'Dimmen uit'],['software','software','Software',state.hasUpdate ? `Update ${state.updateVersion} beschikbaar` : `Versie ${state.firmware}`]];
@@ -108,7 +112,7 @@ function moveTo(target, name) {
   target = clampHeight(target);
   if (!state.connected) return;
   if (Math.abs(state.height - target) < 1) { say('Het bureau staat al op deze hoogte.'); return; }
-  stopTimer(); state.target = target; state.motionName = name; state.screen = 'moving'; state.paused = false; state.manual = false;
+  stopTimer(); state.motionStart = state.height; state.target = target; state.motionName = name; state.screen = 'moving'; state.paused = false; state.manual = false;
   render(); say('Gesimuleerde beweging. Tik op het paneel of druk op Esc om te stoppen.');
   motionFrame = requestAnimationFrame(tick);
 }
@@ -120,6 +124,7 @@ function tick(time) {
   const travel = Math.min(Math.abs(delta), elapsed * 35);
   state.height += Math.sign(delta) * travel;
   const height = document.querySelector('#motion-height'); if (height) height.textContent = fmt(state.height);
+  panel.querySelector('.moving-stop').style.setProperty('--motion-progress', `${motionProgress()}%`);
   syncTools();
   if (Math.abs(state.height - state.target) < .1) { state.height = state.target; stopTimer(); state.screen = 'desk'; render(); say(`Doelhoogte bereikt: ${fmt(state.height)} cm.`); return; }
   motionFrame = requestAnimationFrame(tick);
