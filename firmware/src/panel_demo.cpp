@@ -73,7 +73,8 @@ void PanelDemo::draw(uint16_t *p) const {
   if(screen==Updates) {
     frame=updateState==PanelUpdateView::Checking?20:updateState==PanelUpdateView::Downloading?21:
       updateState==PanelUpdateView::Current?22:updateState==PanelUpdateView::CheckFailed?23:
-      updateState==PanelUpdateView::Installing?Updating:updateState==PanelUpdateView::Installed?Updated:
+      (updateState==PanelUpdateView::Installing || updateState==PanelUpdateView::Verifying)?Updating:
+      updateState==PanelUpdateView::Installed?Updated:
       updateState==PanelUpdateView::InstallFailed?UpdateFailed:17;
   } else if(screen==Welcome)frame=24;
   else if(screen==Desk && profileActive)frame=18;
@@ -127,13 +128,19 @@ void PanelDemo::draw(uint16_t *p) const {
     bool installing=updateState==PanelUpdateView::Installing;
     bool installed=updateState==PanelUpdateView::Installed;
     bool installFailed=updateState==PanelUpdateView::InstallFailed;
-    if(installing || installed) {
-      rect(p,20,65,610,43,Bg);
+    if(updateState==PanelUpdateView::Verifying) {
+      rect(p,20,53,610,99,Bg);
+      text(p,24,81,"Nieuwe firmware controleren",10,Ink);
+      text(p,24,109,"Het paneel controleert de installatie.",1,Muted);
+    } else if(installing || installed) {
+      // Clear the whole sample title while preserving the artwork's subtitle.
+      rect(p,20,installing?53:68,610,42,Bg);
       snprintf(value,sizeof(value),installing?"Versie %s installeren":"Bijgewerkt naar %s",updateVersion[0]?updateVersion:updateRunningVersion);
-      text(p,24,96,value,10,Ink);
+      text(p,24,installing?81:101,value,width(value,10)<=592?10:3,Ink);
       if(installing) {
+        rect(p,20,123,606,25,Bg);
         rect(p,24,132,532,6,Selected);rect(p,24,132,532*updateProgress/100,6,Gold);
-        rect(p,570,120,70,50,Bg);snprintf(value,sizeof(value),"%d%%",updateProgress);text(p,616-width(value,2),141,value,2,Ink);
+        snprintf(value,sizeof(value),"%d%%",updateProgress);text(p,616-width(value,2),141,value,2,Ink);
       }
     } else if(!installFailed) {
       bool error=updateState==PanelUpdateView::CheckFailed;
@@ -144,8 +151,9 @@ void PanelDemo::draw(uint16_t *p) const {
       }
       if(downloading) {
         rect(p,112,89,308,25,Bg);snprintf(value,sizeof(value),"Versie %s downloaden...",updateVersion);text(p,118,107,value,1,Gold);
+        rect(p,112,117,308,30,Bg);
         rect(p,118,130,236,6,Selected);rect(p,118,130,236*updateProgress/100,6,Gold);
-        rect(p,368,117,50,30,Bg);snprintf(value,sizeof(value),"%d%%",updateProgress);text(p,410-width(value,2),138,value,2,Ink);
+        snprintf(value,sizeof(value),"%d%%",updateProgress);text(p,410-width(value,2),138,value,2,Ink);
       } else if(updateState==PanelUpdateView::Available) {
         rect(p,112,104,308,27,Bg);snprintf(value,sizeof(value),"Versie %s beschikbaar",updateVersion);text(p,118,122,value,1,Gold);
       } else if(updateState==PanelUpdateView::Idle || error) {
