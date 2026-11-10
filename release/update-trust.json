@@ -1,6 +1,12 @@
 {
   "schema": 1,
-  "mode": "bench",
+  "mode": "signed",
   "minimum_counter": 0,
-  "keys": []
+  "keys": [
+    {
+      "id": "1eb336c6282dc827ed3032403755bffb",
+      "public_key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEbRGgH3fCj7cTktLkhwukaz17K28GzyVQp+xj4ha6qeYMANctcqKzg97XpTeztEd29YfUkGJiIUwitdClFjBggg==",
+      "revoked": false
+    }
+  ]
 }
