@@ -116,6 +116,11 @@ void PanelDemo::draw(uint16_t *p) const {
       }
     }
   } else if(screen==Moving) {
+    const int distance = target - motionStart;
+    const int progress = distance ? (height - motionStart) * 640 / distance : 0;
+    const int fill = progress < 0 ? 0 : progress > 640 ? 640 : progress;
+    rect(p, 0, 172, 640, 8, rgb(220, 213, 194));
+    rect(p, 0, 172, fill, 8, rgb(118, 98, 47));
     rect(p,35,65,275,81,Cream);number(p,40,128,height,8,Bg,Brown);
     if(manualHold) {
       rect(p,35,38,420,24,Cream);text(p,40,55,motionKind==3?"BUREAU OMHOOG - LOSLATEN OM TE STOPPEN":"BUREAU OMLAAG - LOSLATEN OM TE STOPPEN",0,Brown);
@@ -252,6 +257,7 @@ void PanelDemo::move(int value,int kind) {
   if(!connected || busy) return;
   value=clampHeight(value);
   if(height==value) { screen=Desk;dirty=true;return; }
+  motionStart = height;
   target=value;motionKind=kind;screen=Moving;lastTick=0;savedPreset=0;dirty=true;
 }
 void PanelDemo::setDeviceState(const PanelDeviceState &value) {
@@ -406,7 +412,7 @@ bool PanelDemo::scene(int index,uint32_t now,bool preserveSettings) {
     if(index==22)strcpy(updateRunningVersion,"0.9.0");
     if(index==23)strcpy(updateStatus,"Controleren lukte niet. Probeer het later opnieuw.");
   }
-  if(screen==Moving) { height=942;target=1120;motionKind=2;freezeUntil=now+5000; }
+  if(screen==Moving) { motionStart=740;height=942;target=1120;motionKind=2;freezeUntil=now+5000; }
   if(screen==Offline)connected=false;
   if(screen==Presets)height=1086;
   if(screen==SettingsRotated)rotated=true;

@@ -136,6 +136,19 @@ int main(int argc,char **argv) {
   d.draw(memory+1);
   for(int y=125;y<145;++y) for(int x=24;x<616;++x)
     assert(memory[1+y*640+x]==background);
+  // The bar starts empty and fills with distance travelled in either direction.
+  for(bool down : {false,true}) {
+    d=PanelDemo();d.setHeight(down?1120:740);
+    tap(d,down?200:320,130,100);tap(d,350,130,250);
+    assert(d.screen==PanelDemo::Moving);
+    d.draw(memory+1);
+    const auto track=memory[1+175*640+639];
+    assert(memory[1+175*640]==track);
+    for(unsigned now=400;now<=5900;now+=100)d.tick(now);
+    assert(d.screen==PanelDemo::Moving);
+    d.draw(memory+1);
+    assert(memory[1+175*640+200]!=track && memory[1+175*640+400]==track);
+  }
   delete[] memory;
 }
 """

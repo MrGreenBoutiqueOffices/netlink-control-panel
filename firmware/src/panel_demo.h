@@ -47,6 +47,7 @@ class PanelDemo {
   void freeze(uint32_t now) { freezeUntil = now + 5000; }
   const char *name() const;
  private:
+  int motionStart = 740;
   int downX = 0, downY = 0, motionKind = 0, savedPreset = 0;
   uint32_t downAt = 0, lastTick = 0, lastTouch = 0, freezeUntil = 0;
   bool finger = false, consumed = false, manualHold = false, calibrating = false;
