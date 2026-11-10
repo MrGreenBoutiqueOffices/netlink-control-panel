@@ -22,7 +22,7 @@ void PanelUpdater::begin() {
   StaticJsonDocument<768> boot;ota.describe(boot.to<JsonObject>());
   const char *running=boot["image_sha256"] | "";
   UpdatePhase reconciled=attempt.reconcile(running,ota.pending());
-  if(reconciled==UpdatePhase::BootPending) {stage=BootCheck;presentation=PanelUpdateView::Installing;strlcpy(message,"Nieuwe firmware lokaal controleren",sizeof(message));return;}
+  if(reconciled==UpdatePhase::BootPending) {stage=BootCheck;presentation=PanelUpdateView::Verifying;strlcpy(message,"Nieuwe firmware lokaal controleren",sizeof(message));return;}
   if(reconciled!=attempt.phase && !save(reconciled)) {fail("Update-uitkomst niet opgeslagen");return;}
   presentation=reconciled==UpdatePhase::Succeeded?PanelUpdateView::Current:PanelUpdateView::InstallFailed;
   if(reconciled==UpdatePhase::Succeeded)strlcpy(message,"Update geslaagd",sizeof(message));

@@ -118,6 +118,24 @@ int main(int argc,char **argv) {
   d=PanelDemo();assert(d.scene(24,100));tap(d,500,130,200);assert(d.screen==PanelDemo::Desk);
   d=PanelDemo();assert(d.scene(24,100));d.setDeviceState(live);assert(!d.profileActive && d.screen==PanelDemo::Desk);
   for(int scene=0;scene<25;scene++){d=PanelDemo();assert(d.scene(scene,100));d.draw(memory+1);assert(memory[0]==0x1234 && memory[640*180+1]==0x5678);}
+  // The real updater overlays a live version onto the installation artwork.
+  static uint16_t installReference[640*180];
+  d=PanelDemo();assert(d.scene(11,100));d.draw(installReference);
+  d.screen=PanelDemo::Updates;
+  d.updateView("Firmware downloaden...","0.9.0",false,64,PanelUpdateView::Installing);
+  d.draw(memory+1);
+  for(int y=95;y<114;++y) for(int x=24;x<400;++x)
+    assert(memory[1+y*640+x]==installReference[y*640+x]);
+  // A short live title must remove the raster title all the way to its right edge.
+  d.updateView("Firmware downloaden...","1",false,64,PanelUpdateView::Installing);
+  d.draw(memory+1);
+  const auto background=memory[1+55*640+24];
+  for(int y=57;y<92;++y) for(int x=274;x<320;++x)
+    assert(memory[1+y*640+x]==background);
+  d.updateView("Nieuwe firmware lokaal controleren","",false,100,PanelUpdateView::Verifying);
+  d.draw(memory+1);
+  for(int y=125;y<145;++y) for(int x=24;x<616;++x)
+    assert(memory[1+y*640+x]==background);
   delete[] memory;
 }
 """
